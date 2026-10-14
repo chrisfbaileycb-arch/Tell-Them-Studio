@@ -1,0 +1,350 @@
+.cw {
+  margin: 0 0 2rem;
+  color: #25303b;
+  font-family: inherit;
+}
+.cw h1 {
+  font-size: clamp(2.1rem, 5vw, 3.7rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+  margin: 0.65rem 0 1rem;
+  max-width: 850px;
+}
+.cw h2 {
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+  margin: 0.4rem 0 0.65rem;
+}
+.cw h3 {
+  font-size: 1.2rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  margin: 0.35rem 0;
+}
+.cw p {
+  font-size: 0.9rem;
+  line-height: 1.75;
+  color: #66717c;
+  margin: 0.5rem 0 1rem;
+}
+.cw small {
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+  color: #536b68;
+}
+.cw-hero {
+  padding: 2.6rem 3rem;
+  background: linear-gradient(115deg, #edf4ec, #f6f4ee 55%, #f9e9dc);
+  border: 1px solid #e0e7dc;
+  border-radius: 28px;
+  margin-bottom: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+.cw-hero p {
+  max-width: 660px;
+  font-size: 1rem;
+}
+.cw-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.3rem;
+}
+.cw-heading p {
+  max-width: 680px;
+  margin-bottom: 0;
+}
+.cw-pill {
+  font-size: 0.7rem;
+  background: #ecf2ec;
+  color: #446151;
+  padding: 0.6rem 0.9rem;
+  border-radius: 40px;
+  white-space: nowrap;
+}
+.cw-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.3rem;
+}
+.cw-sample {
+  background: white;
+  border: 1px solid #e2e6df;
+  border-radius: 22px;
+  overflow: hidden;
+  display: flex;
+  box-shadow: 0 8px 24px #142a2205;
+}
+.cw-art {
+  min-width: 130px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.8rem 1rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 70% 10%, #ffc8a0, transparent 65%), #bd5d44;
+  color: #fceadd;
+}
+.cw-art > span {
+  font-size: 3rem;
+  font-weight: 300;
+}
+.art-1 {
+  background:
+    radial-gradient(circle at 0% 0%, #94b59c, transparent 65%), #304e48;
+}
+.art-2 {
+  background:
+    radial-gradient(circle at 30% 0%, #b8a9d9, transparent 65%), #504668;
+}
+.art-3 {
+  background:
+    radial-gradient(circle at 0% 0%, #f6d79c, transparent 65%), #9c692c;
+}
+.cw-bars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.cw-bars i {
+  width: 2px;
+  background: currentColor;
+  opacity: 0.5;
+  border-radius: 2px;
+}
+.cw-sample-body {
+  padding: 1.4rem;
+  min-width: 0;
+  flex: 1;
+}
+.cw button {
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid #d8e1da;
+  background: #f2f6f0;
+  color: #2d4c41;
+  font-size: 0.78rem;
+  font-weight: 700;
+  transition: background 0.15s;
+}
+.cw button:hover:not(:disabled) {
+  background: #e5eee2;
+  border-color: #9bafa1;
+}
+.cw button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cw button:focus-visible,
+.cw summary:focus-visible {
+  outline: 3px solid #a2bdb4;
+  outline-offset: 3px;
+}
+.cw .cw-link {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  color: #476b5a;
+}
+.cw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.9rem 0 0;
+}
+.cw audio {
+  width: 100%;
+  height: 38px;
+  margin: 0.7rem 0;
+  min-width: 0;
+}
+.cw .cw-note {
+  font-size: 0.73rem;
+  color: #7a827b;
+  margin: 1rem 0;
+}
+.cw-panel {
+  padding: 1.8rem;
+  border: 1px solid #e2e6df;
+  border-radius: 22px;
+  background: #fff;
+  margin: 1.4rem 0;
+}
+.cw-grid > .cw-panel {
+  margin: 0;
+}
+.cw-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.cw-chips button {
+  background: white;
+}
+.cw-chips .active {
+  background: #2d4c41;
+  color: #fff;
+  border-color: #2d4c41;
+}
+.cw label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 650;
+  margin: 0.8rem 0;
+  color: #42524b;
+}
+.cw input:not([type="checkbox"]):not([type="range"]),
+.cw select,
+.cw textarea {
+  display: block;
+  width: 100%;
+  border: 1px solid #dce3dd;
+  background: #fafbf9;
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  font-size: 0.86rem;
+  font-weight: 400;
+  margin: 0.4rem 0;
+  color: #25303b;
+}
+.cw textarea {
+  min-height: 130px;
+  resize: vertical;
+  line-height: 1.6;
+}
+.cw .cw-check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+.cw-check input {
+  accent-color: #2d4c41;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.cw input[type="range"] {
+  display: block;
+  width: 100%;
+  accent-color: #2d4c41;
+  margin: 1rem 0;
+}
+.cw-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.cw-notice {
+  padding: 1rem 1.3rem;
+  background: #f8f2e6;
+  border: 1px solid #e7dcc5;
+  color: #745d2d;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  margin: 1.4rem 0;
+  white-space: pre-wrap;
+}
+.cw-track {
+  padding: 1.3rem;
+  border: 1px solid #e3e7e0;
+  border-radius: 16px;
+  background: #fcfdfa;
+}
+.cw-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  border: 1px dashed #ccd7cc;
+  border-radius: 14px;
+  color: #758177;
+  font-size: 0.9rem;
+  line-height: 1.8;
+}
+.cw summary {
+  cursor: pointer;
+  color: #446151;
+  font-size: 0.8rem;
+  font-weight: 650;
+  margin: 0.85rem 0;
+}
+.cw details p {
+  max-height: 230px;
+  overflow: auto;
+}
+.cw-conversation {
+  max-height: 520px;
+  overflow: auto;
+  margin: 1rem 0;
+}
+.cw-message {
+  padding: 1rem 1.3rem;
+  border-radius: 14px;
+  background: #f0f4ec;
+  margin: 0.7rem 0;
+}
+.cw-message.user {
+  background: #f7f4ee;
+  margin-left: 10%;
+}
+.cw-message p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0.4rem 0 0;
+  color: #394b43;
+}
+.cw-save {
+  padding: 1.4rem;
+  border: 1px solid #dce6dc;
+  border-radius: 18px;
+  background: #f3f8ef;
+}
+.cw-save button {
+  margin: 0.3rem;
+}
+.cw-heading select {
+  min-width: 140px;
+}
+@media (max-width: 1000px) {
+  .cw-sample {
+    display: block;
+  }
+  .cw-art {
+    height: 100px;
+    flex-direction: row;
+    min-width: 0;
+  }
+  .cw-art > span {
+    font-size: 2.5rem;
+  }
+}
+@media (max-width: 640px) {
+  .cw-grid,
+  .cw-fields {
+    grid-template-columns: 1fr;
+  }
+  .cw-hero {
+    padding: 1.8rem;
+  }
+  .cw-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .cw-panel {
+    padding: 1.2rem;
+  }
+  .cw h2 {
+    font-size: 1.4rem;
+  }
+}

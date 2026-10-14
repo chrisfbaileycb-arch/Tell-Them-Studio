@@ -15,7 +15,17 @@ export const createAudioUrlFromBase64 = (base64: string, mimeType: string): stri
     for (let i = 0; i < len; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
-    const blob = new Blob([bytes], { type: mimeType });
+    let blob: Blob;
+    if (/audio\/(L16|pcm)/i.test(mimeType)) {
+      // Provider PCM payloads have no RIFF header; wrap mono signed 16-bit PCM.
+      const rate = Number(mimeType.match(/rate=(\d+)/)?.[1] || 24000);
+      const header = new ArrayBuffer(44), view = new DataView(header);
+      const text = (offset: number, value: string) => [...value].forEach((c, i) => view.setUint8(offset + i, c.charCodeAt(0)));
+      text(0, 'RIFF'); view.setUint32(4, 36 + bytes.length, true); text(8, 'WAVE'); text(12, 'fmt ');
+      view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+      view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+      text(36, 'data'); view.setUint32(40, bytes.length, true); blob = new Blob([header, bytes], { type: 'audio/wav' });
+    } else { blob = new Blob([bytes], { type: mimeType }); }
     return URL.createObjectURL(blob);
   } catch (e) {
     console.error('Failed to decode audio base64:', e);

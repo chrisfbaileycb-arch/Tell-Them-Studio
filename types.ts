@@ -16,13 +16,24 @@ export type StudioTab =
   | 'podcasts'
   | 'commercials'
   | 'holidays'
-  | 'trending';
+  | 'trending'
+  | 'listen'
+  | 'library'
+  | 'creative';
 
 export type BandArchetype =
   | 'Rock Band'
   | 'Country Band'
   | 'Pop Band'
   | 'Disco Band'
+  | 'Rap'
+  | 'Hip-Hop'
+  | 'Indie'
+  | 'Old-School'
+  | 'Jazz'
+  | 'Electronic'
+  | 'Anime-Inspired'
+  | 'Serenity'
   | 'Custom Genre'
   | 'Singer-Free Instrumental';
 

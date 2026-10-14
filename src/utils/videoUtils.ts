@@ -1,250 +1,190 @@
-/**
- * Video Utilities
- *
- * This module handles the complex logic of rendering audio and cover art into a video file.
- * It uses the Web Audio API for spectrum analysis and the Canvas API for visual rendering.
- *
- * Use Cases:
- * - Exporting a generated song as a video file (WebM) for sharing on social media.
- * - Rendering dynamic audio spectrum visualizations.
- * - Overlaying synchronized lyrics on the video.
- */
-import { SongResult } from '../../types';
-import { parseTimedLyrics } from './lyricsUtils';
-import { logFunctionCall } from './logger';
+import { SongResult } from "../../types";
+import { parseTimedLyrics } from "./lyricsUtils";
 
-/**
- * Generates and downloads a video combining the song's audio, cover art, and optional lyrics.
- * @param result The song result object containing audio and image URLs.
- * @param withLyrics Whether to overlay synchronized lyrics on the video.
- * @param onProgress Callback function to report encoding progress (0-100).
- * @param onComplete Callback function executed when encoding finishes.
- */
-export const handleDownloadVideo = async (
+/** Real-time cover-art/spectrum WebM export. Not a generative animation service. */
+export async function handleDownloadVideo(
   result: SongResult,
   withLyrics: boolean,
   onProgress: (progress: number) => void,
-  onComplete: () => void
-) => {
-  logFunctionCall('handleDownloadVideo', { resultId: result.id, withLyrics });
-  if (!result.audioUrl || !result.coverImageUrl) {
-    onComplete();
-    return;
-  }
-
-  const audio = new Audio(result.audioUrl);
-  audio.crossOrigin = "anonymous";
-  await new Promise(resolve => audio.onloadedmetadata = resolve);
-
-  const canvas = document.createElement('canvas');
-  const canvasWidth = withLyrics ? 1920 : 1080;
-  const canvasHeight = 1080;
-  canvas.width = canvasWidth;
-  canvas.height = canvasHeight;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    onComplete();
-    return;
-  }
-
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = result.coverImageUrl;
-  await new Promise(resolve => img.onload = resolve);
-
-  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  const source = audioCtx.createMediaElementSource(audio);
-  const analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 256;
-  const bufferLength = analyser.frequencyBinCount;
-  const dataArray = new Uint8Array(bufferLength);
-
-  const dest = audioCtx.createMediaStreamDestination();
-  source.connect(analyser);
-  analyser.connect(dest);
-
-  const stream = canvas.captureStream(30);
-  const combined = new MediaStream([...stream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-  const recorder = new MediaRecorder(combined, { mimeType: 'video/webm' });
-  const chunks: Blob[] = [];
-
-  recorder.ondataavailable = e => chunks.push(e.data);
-  recorder.onstop = () => {
-    const url = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${result.title || 'Lyria'}_${withLyrics ? 'Lyrics' : 'Spectrum'}.webm`;
-    link.click();
-    onComplete();
-  };
-
-  const timedLyrics = withLyrics ? parseTimedLyrics(result.lyrics) : [];
-  console.log('[Video Debug] withLyrics:', withLyrics);
-  console.log('[Video Debug] timedLyrics length:', timedLyrics.length);
-  if (withLyrics && timedLyrics.length === 0) {
-    console.warn('[Video Debug] WARNING: withLyrics is true, but timedLyrics is empty. Lyrics will not be displayed.');
-  }
-
-  const workerCode = `
-    let interval;
-    self.onmessage = function(e) {
-      if (e.data === 'start') {
-        interval = setInterval(() => self.postMessage('tick'), 1000 / 30);
-      } else if (e.data === 'stop') {
-        clearInterval(interval);
-      }
+  onComplete: () => void,
+  disclosure = result.originType || "Studio audio",
+): Promise<void> {
+  let audio: HTMLAudioElement | undefined, context: AudioContext | undefined;
+  let stream: MediaStream | undefined, recorder: MediaRecorder | undefined;
+  let frame = 0,
+    timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    if (!result.audioUrl || !result.coverImageUrl)
+      throw new Error("Audio and cover art are required.");
+    if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream)
+      throw new Error("Video recording is not supported by this browser.");
+    const mimeType = [
+      "video/webm;codecs=vp8,opus",
+      "video/webm;codecs=vp9,opus",
+      "video/webm",
+    ].find((t) => MediaRecorder.isTypeSupported(t));
+    if (!mimeType)
+      throw new Error("WebM export is not supported by this browser.");
+    audio = new Audio();
+    audio.crossOrigin = "anonymous";
+    const loaded = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("Audio loading timed out.")),
+        15000,
+      );
+      audio!.onloadedmetadata = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      audio!.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error("Could not decode this audio."));
+      };
+    });
+    audio.src = result.audioUrl;
+    await loaded;
+    if (
+      !Number.isFinite(audio.duration) ||
+      audio.duration <= 0 ||
+      audio.duration > 600
+    )
+      throw new Error("Use finite audio up to ten minutes.");
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("Cover loading timed out.")),
+        15000,
+      );
+      img.onload = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      img.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error("Could not load cover art."));
+      };
+      img.src = result.coverImageUrl!;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = withLyrics ? 1280 : 720;
+    canvas.height = 720;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas rendering is unavailable.");
+    context = new AudioContext();
+    await context.resume();
+    const source = context.createMediaElementSource(audio),
+      analyser = context.createAnalyser();
+    analyser.fftSize = 256;
+    const destination = context.createMediaStreamDestination();
+    source.connect(analyser);
+    analyser.connect(destination);
+    const visual = canvas.captureStream(30);
+    stream = new MediaStream([
+      ...visual.getVideoTracks(),
+      ...destination.stream.getAudioTracks(),
+    ]);
+    recorder = new MediaRecorder(stream, { mimeType });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data.size) chunks.push(e.data);
     };
-  `;
-  const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
-  const workerUrl = URL.createObjectURL(workerBlob);
-  const worker = new Worker(workerUrl);
-
-  let lastProgress = -1;
-
-  recorder.start();
-  audio.play().catch(err => {
-    console.error("Audio playback failed:", err);
-    worker.postMessage('stop');
-    worker.terminate();
-    URL.revokeObjectURL(workerUrl);
-    recorder.stop();
-    audioCtx.close();
-    onComplete();
-  });
-
-  const getWrappedLines = (context: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
-    const words = text.split(' ');
-    const lines: string[] = [];
-    let line = '';
-
-    for (let n = 0; n < words.length; n++) {
-      const testLine = line + words[n] + ' ';
-      const metrics = context.measureText(testLine);
-      const testWidth = metrics.width;
-      if (testWidth > maxWidth && n > 0) {
-        lines.push(line.trim());
-        line = words[n] + ' ';
-      } else {
-        line = testLine;
+    let timed = withLyrics ? parseTimedLyrics(result.lyrics || "") : [];
+    // Plain lyrics are distributed approximately, rather than falsely claiming word alignment.
+    if (withLyrics && !timed.length) {
+      const lines = (result.lyrics || "")
+        .split("\n")
+        .filter((l) => l.trim() && !/^\[.*\]$/.test(l.trim()));
+      timed = lines.map((text, i) => ({
+        text,
+        time: (i * audio!.duration) / lines.length,
+      }));
+    }
+    const bins = new Uint8Array(analyser.frequencyBinCount);
+    const wrap = (text: string, width: number) => {
+      const lines: string[] = [];
+      let line = "";
+      for (const word of text.split(/\s+/)) {
+        if (line && ctx.measureText(`${line} ${word}`).width > width) {
+          lines.push(line);
+          line = word;
+        } else line += `${line ? " " : ""}${word}`;
       }
-    }
-    lines.push(line.trim());
-    return lines;
-  };
-
-  const draw = () => {
-    if (!ctx) return;
-
-    // Clear and draw background
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-    if (withLyrics) {
-      ctx.filter = 'blur(40px)';
-      ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
-      ctx.filter = 'none';
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-    }
-
-    // Draw cover image on the left (or center if no lyrics)
-    ctx.drawImage(img, 0, 0, 1080, 1080);
-
-    // Add a darker overlay for readability
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fillRect(0, 0, 1080, 1080);
-
-    // Get frequency data for spectrum
-    analyser.getByteFrequencyData(dataArray);
-
-    // Draw Spectrum Bars
-    const barWidth = (1080 / bufferLength) * 2.5;
-    let barHeight;
-    let x = 0;
-    for (let i = 0; i < bufferLength; i++) {
-      barHeight = (dataArray[i] / 255) * 300;
-
-      // Gradient for bars
-      const gradient = ctx.createLinearGradient(0, 1080, 0, 1080 - barHeight);
-      gradient.addColorStop(0, 'rgba(255, 45, 85, 0.8)');
-      gradient.addColorStop(1, 'rgba(175, 82, 222, 0.8)');
-
-      ctx.fillStyle = gradient;
-      ctx.fillRect(x, 1080 - barHeight, barWidth - 2, barHeight);
-      x += barWidth;
-    }
-
-    // Draw AI Transparency & Human Artist Respect Identifier Badge on Video Export
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
-    ctx.fillRect(32, 32, 540, 56);
-    ctx.font = 'bold 20px "Plus Jakarta Sans", sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    const disclosureLabel = result.originType || 'AI-Generated Material';
-    ctx.fillText(`${disclosureLabel} · ${result.creatorHandle || '@studio_creator'}`, 52, 60);
-
-    // Draw Lyrics if enabled
-    if (withLyrics && timedLyrics.length > 0) {
-      const currentTime = audio.currentTime;
-      let currentLine = "";
-      for (let i = timedLyrics.length - 1; i >= 0; i--) {
-        if (currentTime >= timedLyrics[i].time) {
-          currentLine = timedLyrics[i].text;
-          break;
-        }
+      if (line) lines.push(line);
+      return lines.slice(0, 6);
+    };
+    const draw = () => {
+      ctx.fillStyle = "#172923";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, 720, 720);
+      ctx.fillStyle = "#0004";
+      ctx.fillRect(0, 0, 720, 720);
+      analyser.getByteFrequencyData(bins);
+      ctx.fillStyle = "#ecbfb3";
+      for (let i = 0; i < 64; i++) {
+        const height = (bins[i] / 255) * 160;
+        ctx.fillRect(i * 11.25, 720 - height, 8, height);
       }
-
-      if (currentLine) {
-        ctx.font = 'bold 64px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        const maxWidth = 1920 - 1080 - 100; // 740px
-        const lines = getWrappedLines(ctx, currentLine, maxWidth);
-        const lineHeight = 80;
-        const totalHeight = lines.length * lineHeight;
-        let startY = 1080 / 2 - totalHeight / 2 + lineHeight / 2;
-
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 8;
-        ctx.fillStyle = 'white';
-
-        const centerX = 1080 + (1920 - 1080) / 2;
-
-        for (const line of lines) {
-          ctx.strokeText(line, centerX, startY);
-          ctx.fillText(line, centerX, startY);
-          startY += lineHeight;
-        }
+      ctx.fillStyle = "#000a";
+      ctx.fillRect(18, 18, 684, 48);
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "left";
+      ctx.font = "bold 15px sans-serif";
+      ctx.fillText(
+        `${disclosure} · ${result.creatorHandle || "@studio_creator"}`,
+        32,
+        48,
+        652,
+      );
+      ctx.font = "bold 28px sans-serif";
+      ctx.fillText(result.title || "Studio creation", 32, 640, 650);
+      if (withLyrics) {
+        const current = [...timed]
+          .reverse()
+          .find((l) => audio!.currentTime >= l.time);
+        ctx.font = "bold 30px sans-serif";
+        ctx.textAlign = "center";
+        const lines = wrap(current?.text || "", 490);
+        lines.forEach((line, i) =>
+          ctx.fillText(line, 1000, 340 + (i - lines.length / 2) * 45),
+        );
       }
-    }
-
-    // Update progress
-    if (audio.duration) {
-      const currentProgress = Math.round((audio.currentTime / audio.duration) * 100);
-      if (currentProgress !== lastProgress) {
-        lastProgress = currentProgress;
-        onProgress(currentProgress);
-      }
-    }
-
-    if (audio.paused && audio.currentTime >= audio.duration) {
-      worker.postMessage('stop');
-      return;
-    }
-  };
-
-  worker.onmessage = () => {
+      onProgress(Math.min(100, (audio!.currentTime / audio!.duration) * 100));
+      frame = requestAnimationFrame(draw);
+    };
     draw();
-  };
-
-  worker.postMessage('start');
-  audio.onended = () => { 
-    worker.postMessage('stop');
-    worker.terminate();
-    URL.revokeObjectURL(workerUrl);
-    recorder.stop(); 
-    audioCtx.close(); 
-  };
-};
+    await new Promise<void>((resolve, reject) => {
+      recorder!.onerror = () => reject(new Error("Video encoder failed."));
+      recorder!.onstop = () => resolve();
+      audio!.onended = () => {
+        if (recorder!.state !== "inactive") recorder!.stop();
+      };
+      audio!.onerror = () => reject(new Error("Audio playback failed."));
+      timeout = setTimeout(
+        () =>
+          reject(
+            new Error("Export timed out. Keep this page open and try again."),
+          ),
+        (audio!.duration + 30) * 1000,
+      );
+      recorder!.start(1000);
+      audio!.play().catch(reject);
+    });
+    if (!chunks.length) throw new Error("The encoder returned no video.");
+    const url = URL.createObjectURL(new Blob(chunks, { type: mimeType }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${result.title || "Studio"}_${withLyrics ? "Lyrics" : "Spectrum"}.webm`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    onProgress(100);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+    cancelAnimationFrame(frame);
+    audio?.pause();
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    stream?.getTracks().forEach((t) => t.stop());
+    if (context && context.state !== "closed") await context.close();
+    onComplete();
+  }
+}
