@@ -40,14 +40,26 @@ import {
 } from './src/services/genaiService';
 import { getRandomItem } from './src/utils/helpers';
 import { PromptBuilder, HelperSection } from './src/components/PromptBuilder';
+import { CreativeWorkspace, GenreSamples, PodcastSamples, SaveCreations } from './src/components/CreativeWorkspace';
 import { TrendingView } from './src/components/TrendingView';
 
 const App: React.FC = () => {
   // Active workspace tab
-  const [activeTab, setActiveTab] = useState<StudioTab>('bands');
+  const [activeTab, setActiveTab] = useState<StudioTab>(() => { const route = window.location.hash.slice(1); return ['bands', 'stations', 'podcasts', 'commercials', 'holidays', 'trending', 'listen', 'library', 'creative'].includes(route) ? route as StudioTab : 'bands'; });
+
+  useEffect(() => {
+    const onRoute = () => {
+      const route = window.location.hash.slice(1);
+      if (['bands', 'stations', 'podcasts', 'commercials', 'holidays', 'trending', 'listen', 'library', 'creative'].includes(route)) setActiveTab(route as StudioTab);
+    };
+    window.addEventListener('hashchange', onRoute);
+    return () => window.removeEventListener('hashchange', onRoute);
+  }, []);
+  useEffect(() => { window.history.replaceState(null, '', `#${activeTab}`); window.scrollTo({ top: 0, behavior: 'instant' }); }, [activeTab]);
 
   // Creator Handle (Safe handle-only identity, no personal info)
-  const [creatorHandle, setCreatorHandle] = useState('@studio_voyager');
+  const [creatorHandle, setCreatorHandle] = useState(() => { try { return localStorage.getItem('tell-them-handle') || '@studio_voyager'; } catch { return '@studio_voyager'; } });
+  useEffect(() => { try { localStorage.setItem('tell-them-handle', creatorHandle); } catch { /* Browser privacy mode may disable persistence. */ } }, [creatorHandle]);
   const [isEditingHandle, setIsEditingHandle] = useState(false);
   const [handleDraft, setHandleDraft] = useState('@studio_voyager');
 
@@ -499,9 +511,8 @@ const App: React.FC = () => {
         })
         .join('\n\n');
 
-      const audioUrl = data.audioBase64
-        ? createAudioUrlFromBase64(data.audioBase64, data.mimeType || 'audio/wav')
-        : createStudioPreviewWavUrl('disco');
+      if (!data.audioBase64) throw new Error('Podcast speech was not returned. No music demo has been substituted.');
+      const audioUrl = createAudioUrlFromBase64(data.audioBase64, data.mimeType || 'audio/L16;rate=24000');
 
       const coverImageUrl = await generateCoverArt(
         podcastShowTitle,
@@ -595,9 +606,8 @@ const App: React.FC = () => {
         voiceName: adVoice,
       });
 
-      const audioUrl = data.audioBase64
-        ? createAudioUrlFromBase64(data.audioBase64, data.mimeType || 'audio/wav')
-        : createStudioPreviewWavUrl('rock');
+      if (!data.audioBase64) throw new Error('Commercial speech was not returned. No music demo has been substituted.');
+      const audioUrl = createAudioUrlFromBase64(data.audioBase64, data.mimeType || 'audio/L16;rate=24000');
 
       const coverImageUrl = await generateCoverArt(
         adBrandName,
@@ -767,7 +777,7 @@ const App: React.FC = () => {
     setEncodingVideoId(result.id);
     setEncodingProgress(0);
 
-    await handleDownloadVideo(
+    try { await handleDownloadVideo(
       result,
       withLyrics,
       (progress) => setEncodingProgress(progress),
@@ -775,7 +785,7 @@ const App: React.FC = () => {
         setEncodingVideoId(null);
         setEncodingProgress(0);
       }
-    );
+    ); } catch (error) { setSafetyFeedback(`Video export failed: ${(error as Error).message}`); }
   };
 
   const handleSyndicateToggle = (
@@ -944,7 +954,10 @@ const App: React.FC = () => {
           <div className="flex flex-wrap items-center gap-1 p-1 bg-gray-100 rounded-xl">
             {(
               [
-                { id: 'bands', label: 'Multi-Singer Bands' },
+                { id: 'listen', label: 'Told Them · Listen' },
+                { id: 'bands', label: 'Band Studio' },
+                { id: 'creative', label: 'AI · Lyrics, Video & Mix' },
+                { id: 'library', label: 'My Library' },
                 { id: 'stations', label: 'Radio Stations' },
                 { id: 'podcasts', label: 'Mini-Podcasts (5–10m)' },
                 { id: 'commercials', label: 'Commercial Craft' },
@@ -983,6 +996,15 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {(['listen', 'library', 'creative'] as string[]).includes(activeTab) && (
+          <CreativeWorkspace key={activeTab} mode={activeTab as 'listen' | 'library' | 'creative'} owner={creatorHandle}
+            onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setIsHelperOpen(false); setActiveTab('bands'); }}
+            onPodcast={() => setActiveTab('podcasts')}
+            onLyrics={(lyrics) => { setCustomLyrics(lyrics); setLyricsOption('Custom'); setIsHelperOpen(false); setActiveTab('bands'); }} />
+        )}
+        {activeTab === 'podcasts' && <><PodcastSamples /><div className="cw cw-actions"><button onClick={() => setActiveTab('library')}>Your podcast library ↗</button><button onClick={() => setActiveTab('creative')}>Discuss an episode idea ↗</button></div></>}
+        {activeTab === 'commercials' && <GenreSamples genre="Pop Band" owner={creatorHandle} onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setActiveTab('bands'); }} />}
+
         {/* ===================================================================== */}
         {/* TAB 1: MULTI-SINGER BAND & CUSTOM GENRE STUDIO                        */}
         {/* ===================================================================== */}
@@ -996,10 +1018,12 @@ const App: React.FC = () => {
                 Build Your Band, Vocal Lineup & Radio Single
               </h1>
               <p className="text-base md:text-lg text-gray-500 max-w-3xl mx-auto font-normal leading-relaxed">
-                Craft multi-singer Rock, Country, Pop, and Disco band tracks—or generate singer-free backing bands to showcase your own live voice. Every track is radio-paced at a maximum of 2 minutes and 48 seconds and ready to publish to Spotify, YouTube, and Amazon Music.
+                Explore Rock, Country, Rap, Hip-Hop, Indie, Jazz, anime-inspired music, and Serenity—or create singer-free backing tracks for your own voice. Every track is radio-paced at a maximum of 2 minutes and 48 seconds and ready to publish to Spotify, YouTube, and Amazon Music.
               </p>
             </section>
 
+            <GenreSamples genre={selectedBand} owner={creatorHandle} onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setIsHelperOpen(false); }} />
+            <div className="cw cw-actions mb-6"><button onClick={() => setActiveTab('library')}>Your private library ↗</button><button onClick={() => setActiveTab('creative')}>Ask for lyrics, video, or creative help ↗</button><button onClick={() => setActiveTab('listen')}>Explore all genres ↗</button></div>
             <section className="bg-white rounded-[36px] p-8 md:p-10 card-shadow border border-gray-200/80 mb-12 relative z-10">
               <div className="space-y-8">
                 {/* Step 1: Band Archetype & Custom Genre */}
@@ -2101,6 +2125,8 @@ const App: React.FC = () => {
         {/* ===================================================================== */}
         {/* SHARED STUDIO GALLERY: SONGS, PODCASTS & COMMERCIALS                  */}
         {/* ===================================================================== */}
+        {!['listen', 'library', 'creative'].includes(activeTab) && <>
+        <SaveCreations results={gen.results} owner={creatorHandle} />
         {gen.results.length > 0 && (
           <div className="relative mb-8 flex items-center justify-between border-b border-gray-200/80 pb-4">
             <div>
@@ -2527,6 +2553,7 @@ const App: React.FC = () => {
             );
           })}
         </div>
+        </>}
       </main>
 
       {/* ===================================================================== */}

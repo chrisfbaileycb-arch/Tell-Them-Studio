@@ -1,14 +1,18 @@
+import { config as loadEnv } from 'dotenv';
 import express from 'express';
+import { CREATIVE_SYSTEM_INSTRUCTION, validateCreativeRequest } from './src/services/creativePolicy';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Modality, Type } from '@google/genai';
 
+loadEnv({ path: '.env.local', quiet: true });
 const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '50mb' }));
 
 function getAiClient() {
+  if (!process.env.GEMINI_API_KEY) throw new Error('AI is not configured. Set GEMINI_API_KEY on the server to enable generation.');
   return new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
     httpOptions: {
@@ -19,6 +23,28 @@ function getAiClient() {
   });
 }
 
+// Creative assistance is server-proxied: keys never enter the browser.
+app.post('/api/creative-assistant', async (req, res) => {
+  const invalid = validateCreativeRequest(req.body);
+  if (invalid) return res.status(400).json({ error: invalid });
+  if (!process.env.GEMINI_API_KEY) return res.status(503).json({ error: 'The creative assistant is not connected yet. Configure GEMINI_API_KEY on the server. Your library and original sketches work without it.' });
+  try {
+    const { task, message, history = [], genre = '', audio } = req.body;
+    const parts: any[] = [{ text: `Task: ${task}. Creative direction: ${genre}.\n${message}` }];
+    if (audio) parts.push({ inlineData: { data: audio.data, mimeType: audio.mimeType } });
+    const response = await getAiClient().models.generateContent({
+      model: process.env.CREATIVE_MODEL || 'gemini-2.5-flash',
+      contents: [...history.map((m: any) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.text }] })), { role: 'user', parts }],
+      config: { systemInstruction: CREATIVE_SYSTEM_INSTRUCTION, maxOutputTokens: 2400, httpOptions: { timeout: 60000 } },
+    });
+    if (!response.text?.trim()) return res.status(502).json({ error: 'The assistant returned no response. Try a shorter or different brief.' });
+    res.json({ text: response.text.trim() });
+  } catch (error) {
+    console.error('Creative assistant failed:', error);
+    res.status(502).json({ error: 'The AI service could not complete this request. Check the configured model and provider access, then try again.' });
+  }
+});
+
 // 1. Generate Song Title
 app.post('/api/generate-title', async (req, res) => {
   try {
@@ -26,7 +52,7 @@ app.post('/api/generate-title', async (req, res) => {
     const ai = getAiClient();
     const prompt = `Based on this music prompt: "${musicPrompt}" and these lyrics: "${(lyricContext || '').substring(0, 500)}", generate a catchy, evocative, short song title (3 words max). Return ONLY the title string, no quotes or extra text.`;
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: process.env.TEXT_MODEL || 'gemini-2.5-flash',
       contents: prompt,
     });
     res.json({ title: response.text?.trim() || 'Untitled Studio Track' });
@@ -43,7 +69,7 @@ app.post('/api/generate-cover', async (req, res) => {
     const ai = getAiClient();
     const imagePrompt = `A high-quality, professional square album cover for a radio-ready track titled "${title || 'Studio Session'}". Atmosphere: ${musicPrompt}. Context: ${(lyricContext || '').substring(0, 200)}. Editorial studio photography and graphic art aesthetic. IMPORTANT: Ignore any mention of BPM or musical scale in the prompt; do NOT print any numbers, BPM, or scale text on the image.`;
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-image',
+      model: process.env.COVER_MODEL || 'gemini-3.1-flash-lite-image',
       contents: { parts: [{ text: imagePrompt }] },
       config: {
         imageConfig: { aspectRatio: '1:1' },
@@ -70,7 +96,7 @@ app.post('/api/generate-music', async (req, res) => {
   try {
     const { promptText, isClip, images } = req.body;
     const ai = getAiClient();
-    const modelId = isClip ? 'lyria-3-clip-preview' : 'lyria-3-pro-preview';
+    const modelId = isClip ? (process.env.MUSIC_CLIP_MODEL || 'lyria-3-clip-preview') : (process.env.MUSIC_MODEL || 'lyria-3-pro-preview');
 
     const contents: any =
       Array.isArray(images) && images.length > 0
@@ -165,10 +191,10 @@ Return JSON with:
 - episodeTitle: catchy title
 - showNotes: 2-3 sentence summary for Spotify, YouTube, and Amazon Music
 - chapters: array of { timestamp: string, title: string, summary: string } covering the ${targetMinutes}-minute arc
-- scriptLines: array of 8 to 10 rich conversational dialogue turns between ${hostAName} and ${hostBName} with natural podcast energy.`;
+- scriptLines: array of 12 to 18 conversational dialogue turns between ${hostAName} and ${hostBName}, approximately ${Number(targetMinutes) * 140} spoken words in total. Duration is a pacing target, not a guaranteed encoded duration.`;
 
     const scriptResponse = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: process.env.TEXT_MODEL || 'gemini-2.5-flash',
       contents: scriptPrompt,
       config: {
         responseMimeType: 'application/json',
@@ -212,14 +238,10 @@ Return JSON with:
     // Synthesize multi-speaker audio using gemini-3.8-flash-tts
     const ttsParts = lines.map((line) => ({
       text: `${line.speaker}: ${line.text}`,
-      speechMetadata: {
-        speaker: line.speaker === hostBName ? hostBName : hostAName,
-        style: line.speaker === hostBName ? 'Curious, articulate podcast co-host' : 'Enthusiastic, warm radio podcast host',
-      },
     }));
 
     const ttsResponse = await ai.models.generateContent({
-      model: 'gemini-3.8-flash-tts',
+      model: process.env.TTS_MODEL || 'gemini-2.5-flash-preview-tts',
       contents: [
         {
           role: 'user',
@@ -257,7 +279,7 @@ Return JSON with:
       chapters: parsed.chapters || [],
       scriptLines: lines,
       audioBase64,
-      mimeType: 'audio/wav',
+      mimeType: ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType || 'audio/L16;rate=24000',
     });
   } catch (error: any) {
     console.error('Error generating podcast:', error);
@@ -302,7 +324,7 @@ Return JSON with:
 - complianceNotes: brief confirmation of PG safety, truth-in-advertising, and no-impersonation compliance.`;
 
     const copyResponse = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: process.env.TEXT_MODEL || 'gemini-2.5-flash',
       contents: adPrompt,
       config: {
         responseMimeType: 'application/json',
@@ -343,16 +365,13 @@ Return JSON with:
 
     // Synthesize commercial voiceover with gemini-3.8-flash-lite-tts
     const ttsResponse = await ai.models.generateContent({
-      model: 'gemini-3.8-flash-lite-tts',
+      model: process.env.TTS_MODEL || 'gemini-2.5-flash-preview-tts',
       contents: [
         {
           role: 'user',
           parts: [
             {
               text: parsed.voiceoverScript || `${brandName}. ${productOrService}. ${callToAction}`,
-              speechMetadata: {
-                style: `Warm, articulate, professional broadcast commercial voiceover (${adTone})`,
-              },
             },
           ],
         },
@@ -372,7 +391,7 @@ Return JSON with:
     res.json({
       ...parsed,
       audioBase64,
-      mimeType: 'audio/wav',
+      mimeType: ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType || 'audio/L16;rate=24000',
     });
   } catch (error: any) {
     console.error('Error generating commercial:', error);
