@@ -2,8 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   BandArchetype,
   ContentOriginType,
+  DistributionPlatformName,
   Duration,
   GenerationState,
+  HandoffPlatformInfo,
   HolidayTemplate,
   LyricsOption,
   PraiseComment,
@@ -19,6 +21,7 @@ import {
   INITIAL_RADIO_STATIONS,
   Icons,
   PROMPT_HELPER_CONFIG,
+  TOP_HANDOFF_PLATFORMS,
   VOCAL_ARRANGEMENTS,
   createStudioCoverSvg,
 } from './constants';
@@ -42,6 +45,7 @@ import { getRandomItem } from './src/utils/helpers';
 import { PromptBuilder, HelperSection } from './src/components/PromptBuilder';
 import { CreativeWorkspace, GenreSamples, PodcastSamples, SaveCreations } from './src/components/CreativeWorkspace';
 import { TrendingView } from './src/components/TrendingView';
+import { Hero } from './src/components/Hero';
 
 const App: React.FC = () => {
   // Active workspace tab
@@ -149,8 +153,9 @@ const App: React.FC = () => {
   >({});
   const [safetyFeedback, setSafetyFeedback] = useState<string | null>(null);
 
-  // Publish & Syndicate Modal State
+  // Publish & Direct Creator Handoff Modal State
   const [publishTargetResult, setPublishTargetResult] = useState<SongResult | null>(null);
+  const [handoffNotice, setHandoffNotice] = useState<string | null>(null);
   const [isStandardsModalOpen, setIsStandardsModalOpen] = useState(false);
 
   // Helper Mode States
@@ -798,7 +803,7 @@ const App: React.FC = () => {
 
   const handleSyndicateToggle = (
     resultId: string,
-    platform: 'Spotify' | 'YouTube' | 'Amazon Music' | 'Apple Podcasts'
+    platform: DistributionPlatformName
   ) => {
     updateResult(resultId, (r) => {
       const exists = r.publishedPlatforms.includes(platform);
@@ -821,6 +826,69 @@ const App: React.FC = () => {
     }
   };
 
+  const buildHandoffMetadataText = (result: SongResult, platformName?: string) => {
+    const genreLabel =
+      result.bandType === 'Custom Genre' && result.customGenreName
+        ? result.customGenreName
+        : result.bandType;
+    return [
+      `Title: ${result.title || 'Untitled Studio Creation'}`,
+      `Creator Handle: ${result.creatorHandle}`,
+      `Format / Genre: ${genreLabel} (${result.vocalArrangement})`,
+      `Duration Compliance: ${result.maxCapLabel}`,
+      `Mandatory Transparency Identifier: ${result.originType}`,
+      platformName ? `Destination Portal: ${platformName} (Creator-Authenticated Handoff)` : '',
+      `---`,
+      result.lyrics ? cleanLyricsForDisplay(result.lyrics) : 'Instrumental / Studio Audio Master',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  };
+
+  const handleCopyHandoffMetadata = async (result: SongResult, platformName?: string) => {
+    const text = buildHandoffMetadataText(result, platformName);
+    try {
+      await navigator.clipboard.writeText(text);
+      setHandoffNotice(
+        platformName
+          ? `Copied release metadata for ${platformName}! Log into your own ${platformName} account in the opened tab to upload your audio/video.`
+          : 'Copied release metadata & AI/Human origin disclosure to your clipboard!'
+      );
+    } catch {
+      setHandoffNotice(
+        'Handoff ready! Download your WAV/Video below and sign in with your own account on the destination platform.'
+      );
+    }
+  };
+
+  const handleDownloadHandoffPackage = (result: SongResult) => {
+    handleDownload(result);
+    const manifest = {
+      handoffType: 'Tell Them Studio Direct Creator Handoff (Zero Stored Keys)',
+      authPolicy: 'Creator authenticates directly on destination platform with their own login. No third-party API keys or OAuth tokens are stored by Tell Them Studio.',
+      title: result.title || 'Untitled Studio Track',
+      creatorHandle: result.creatorHandle,
+      genre: result.bandType === 'Custom Genre' ? result.customGenreName : result.bandType,
+      vocalArrangement: result.vocalArrangement,
+      originIdentifier: result.originType,
+      durationCap: result.maxCapLabel,
+      lyricsOrTranscript: result.lyrics ? cleanLyricsForDisplay(result.lyrics) : '',
+      destinations: TOP_HANDOFF_PLATFORMS.map((p) => ({
+        platform: p.name,
+        handoffUrl: p.handoffUrl,
+        acceptedFormats: p.acceptedFormats,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${(result.title || 'TellThemStudio').replace(/\s+/g, '_')}_Handoff_Manifest.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setHandoffNotice('Downloaded Master WAV + Handoff Release Manifest (.json) for your personal upload!');
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleGenerate();
   };
@@ -828,9 +896,17 @@ const App: React.FC = () => {
   return (
     <div
       id="top"
-      className="min-h-screen flex flex-col pb-24 overflow-x-hidden bg-[#fbfbfd] text-[#1d1d1f]"
+      className="min-h-screen flex flex-col pb-24 overflow-x-hidden bg-[linear-gradient(to_bottom,#ffffff,#ffffff_55%,#f4f4f6_100%)] text-[#09090b] font-geist relative"
       onClick={() => setActiveSelector(null)}
     >
+      {/* Subtle Top Grid Backdrop across the site */}
+      <div
+        className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[560px] opacity-75 
+        bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] 
+        bg-[size:6rem_5rem] 
+        [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]"
+      />
+
       {/* Top Navigation Bar — Strict 3-Zone Contract */}
       <header className="sticky top-0 z-50 glass border-b border-gray-200/70 h-16 flex items-center justify-between gap-8 px-6">
         {/* Zone 1: Single text element wordmark */}
@@ -840,7 +916,7 @@ const App: React.FC = () => {
             e.preventDefault();
             setActiveTab('bands');
           }}
-          className="text-lg font-extrabold tracking-tight text-gray-900 whitespace-nowrap shrink-0"
+          className="text-lg font-bold tracking-tighter text-gray-950 whitespace-nowrap shrink-0"
         >
           Tell Them Studio
         </a>
@@ -849,9 +925,9 @@ const App: React.FC = () => {
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
           <button
             onClick={() => setActiveTab('bands')}
-            className={`hover:text-gray-900 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
+            className={`hover:text-gray-950 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
               activeTab === 'bands'
-                ? 'border-pink-600 text-gray-900 font-semibold'
+                ? 'border-zinc-950 text-gray-950 font-semibold'
                 : 'border-transparent'
             }`}
           >
@@ -863,9 +939,9 @@ const App: React.FC = () => {
               setVocalArrangement('Multi-Singer Trade-Off (Male & Female)');
               setActiveTab('singers');
             }}
-            className={`hover:text-gray-900 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
+            className={`hover:text-gray-950 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
               activeTab === 'singers'
-                ? 'border-pink-600 text-gray-900 font-semibold'
+                ? 'border-zinc-950 text-gray-950 font-semibold'
                 : 'border-transparent'
             }`}
           >
@@ -877,9 +953,9 @@ const App: React.FC = () => {
               setVocalArrangement('Dual Female Lead & Harmony');
               setActiveTab('acoustic');
             }}
-            className={`hover:text-gray-900 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
+            className={`hover:text-gray-950 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
               activeTab === 'acoustic'
-                ? 'border-pink-600 text-gray-900 font-semibold'
+                ? 'border-zinc-950 text-gray-950 font-semibold'
                 : 'border-transparent'
             }`}
           >
@@ -887,9 +963,9 @@ const App: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('stations')}
-            className={`hover:text-gray-900 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
+            className={`hover:text-gray-950 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
               activeTab === 'stations'
-                ? 'border-pink-600 text-gray-900 font-semibold'
+                ? 'border-zinc-950 text-gray-950 font-semibold'
                 : 'border-transparent'
             }`}
           >
@@ -897,9 +973,9 @@ const App: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('trending')}
-            className={`hover:text-gray-900 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
+            className={`hover:text-gray-950 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
               activeTab === 'trending'
-                ? 'border-pink-600 text-gray-900 font-semibold'
+                ? 'border-zinc-950 text-gray-950 font-semibold'
                 : 'border-transparent'
             }`}
           >
@@ -911,7 +987,7 @@ const App: React.FC = () => {
         <div className="flex items-center shrink-0">
           <button
             onClick={() => setIsStandardsModalOpen(true)}
-            className="px-4 py-2 text-xs font-semibold text-white bg-gray-900 rounded-xl hover:bg-gray-800 transition-colors whitespace-nowrap shrink-0"
+            className="px-4 py-2 text-xs font-semibold text-white bg-zinc-950 rounded-xl hover:bg-zinc-900 transition-colors whitespace-nowrap shrink-0"
           >
             Safety & Artist Charter
           </button>
@@ -1027,25 +1103,37 @@ const App: React.FC = () => {
         {/* ===================================================================== */}
         {(activeTab === 'bands' || activeTab === 'singers' || activeTab === 'acoustic') && (
           <>
-            <section className="text-center mb-10 space-y-3">
-              <h1
-                className="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight"
-                style={{ textWrap: 'balance' }}
-              >
-                {activeTab === 'singers'
+            <Hero
+              eyebrow={
+                activeTab === 'singers'
+                  ? 'Singer Studio · Lead Vocals, Duets & Live Voice (3:50 Max)'
+                  : activeTab === 'acoustic'
+                  ? 'Acoustic Studio · Unplugged Guitar, Piano & Voice (3:50 Max)'
+                  : 'Band Studio · Multi-Singer Lineups, Custom Genres & Radio Singles'
+              }
+              title={
+                activeTab === 'singers'
                   ? 'Singer Studio: Lead Vocals, Duets & Live Voice'
                   : activeTab === 'acoustic'
                   ? 'Acoustic Studio: Unplugged Guitar, Piano & Voice'
-                  : 'Build Your Band, Vocal Lineup & Radio Single'}
-              </h1>
-              <p className="text-base md:text-lg text-gray-500 max-w-3xl mx-auto font-normal leading-relaxed">
-                {activeTab === 'singers'
+                  : 'Build Your Band, Vocal Lineup & Radio Single'
+              }
+              subtitle={
+                activeTab === 'singers'
                   ? 'Craft vocal-forward solos, male and female duets, 3-part harmonies, or record your own live voice over studio backing tracks—every song can run up to the 3 minutes and 50 seconds (3:50) hard cutoff.'
                   : activeTab === 'acoustic'
                   ? 'Create warm fingerstyle acoustic guitar sessions, upright piano ballads, folk harmonies, and intimate coffeehouse tracks up to the 3 minutes and 50 seconds (3:50) hard cutoff.'
-                  : 'Explore Rock, Country, Rap, Hip-Hop, Indie, Jazz, anime-inspired music, and Serenity—or create singer-free backing tracks for your own voice. Every song can run up to a hard cutoff of 3 minutes and 50 seconds (3:50) (with separate shorter formats for jingles and commercials) and is ready to publish to Spotify, YouTube, and Amazon Music.'}
-              </p>
-
+                  : 'Explore Rock, Country, Rap, Hip-Hop, Indie, Jazz, anime-inspired music, and Serenity—or create singer-free backing tracks for your own voice. Every song can run up to a hard cutoff of 3 minutes and 50 seconds (3:50) (with separate shorter formats for jingles and commercials) and is ready to publish to Spotify, YouTube, and Amazon Music.'
+              }
+              ctaLabel={
+                activeTab === 'singers'
+                  ? 'Open Singer Studio'
+                  : activeTab === 'acoustic'
+                  ? 'Open Acoustic Studio'
+                  : 'Start Creating Below'
+              }
+              ctaHref="#studio-workspace"
+            >
               {activeTab === 'singers' && (
                 <div className="pt-2 flex flex-wrap justify-center gap-2">
                   {[
@@ -1093,7 +1181,7 @@ const App: React.FC = () => {
                         setPrompt(preset.brief);
                         setIsHelperOpen(false);
                       }}
-                      className="px-3.5 py-2 rounded-xl bg-white border border-gray-200 hover:border-blue-500 text-xs font-semibold text-gray-800 shadow-sm transition-colors"
+                      className="px-4 py-2 rounded-3xl bg-white/90 border border-gray-300/60 hover:border-gray-950 text-xs font-semibold text-gray-800 shadow-sm transition-colors"
                     >
                       {preset.label}
                     </button>
@@ -1141,18 +1229,18 @@ const App: React.FC = () => {
                         setPrompt(preset.brief);
                         setIsHelperOpen(false);
                       }}
-                      className="px-3.5 py-2 rounded-xl bg-white border border-gray-200 hover:border-blue-500 text-xs font-semibold text-gray-800 shadow-sm transition-colors"
+                      className="px-4 py-2 rounded-3xl bg-white/90 border border-gray-300/60 hover:border-gray-950 text-xs font-semibold text-gray-800 shadow-sm transition-colors"
                     >
                       {preset.label}
                     </button>
                   ))}
                 </div>
               )}
-            </section>
+            </Hero>
 
             <GenreSamples genre={activeTab === 'acoustic' ? 'Indie' : activeTab === 'singers' ? 'Pop Band' : selectedBand} owner={creatorHandle} onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setIsHelperOpen(false); }} />
             <div className="cw cw-actions mb-6"><button onClick={() => setActiveTab('library')}>Your private library ↗</button><button onClick={() => setActiveTab('creative')}>Ask for lyrics, video, or creative help ↗</button><button onClick={() => setActiveTab('listen')}>Explore all genres ↗</button></div>
-            <section className="bg-white rounded-[36px] p-8 md:p-10 card-shadow border border-gray-200/80 mb-12 relative z-10">
+            <section id="studio-workspace" className="bg-white rounded-[36px] p-8 md:p-10 card-shadow border border-gray-200/80 mb-12 relative z-10">
               <div className="space-y-8">
                 {/* Step 1: Band Archetype & Custom Genre */}
                 <div className="space-y-3">
@@ -1477,19 +1565,15 @@ const App: React.FC = () => {
         {/* ===================================================================== */}
         {activeTab === 'stations' && (
           <section className="space-y-10 mb-14">
-            <div className="text-center space-y-3">
-              <h1
-                className="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900"
-                style={{ textWrap: 'balance' }}
-              >
-                Creator Radio Stations & Syndication Hub
-              </h1>
-              <p className="text-base text-gray-500 max-w-3xl mx-auto">
-                Curate your own radio station combining band songs (up to 3:50 max), weekly mini-podcasts, and craft commercials. Share under safe studio handles and push directly to Spotify, YouTube, and Amazon Music.
-              </p>
-            </div>
+            <Hero
+              eyebrow="Creator Radio Stations · Top 10 Handoff Destinations"
+              title="Creator Radio Stations & Syndication Hub"
+              subtitle="Curate your own radio station combining band songs (up to 3:50 max), weekly mini-podcasts, and craft commercials. Share under safe studio handles and hand off directly to Spotify, YouTube Music, Amazon Music, and more."
+              ctaLabel="Launch a Station"
+              ctaHref="#station-builder"
+            />
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div id="station-builder" className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               {/* Left 5 Cols: Station Builder */}
               <div className="lg:col-span-5 bg-white rounded-[32px] p-8 card-shadow border border-gray-200/80 space-y-5">
                 <h2 className="text-xl font-bold text-gray-900">
@@ -1806,6 +1890,58 @@ const App: React.FC = () => {
                 })}
               </div>
             </div>
+
+            {/* Top 10 Direct Creator Handoff Destinations Directory */}
+            <div className="bg-white rounded-[32px] p-8 card-shadow border border-gray-200/80 space-y-6">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="text-xs font-semibold text-blue-600">
+                    Direct Creator Handoff Links · Zero Stored Keys or Credentials
+                  </div>
+                  <h2 className="text-2xl font-extrabold tracking-tight text-gray-900">
+                    Top 10 Places to Publish Your Music & Podcasts
+                  </h2>
+                  <p className="text-xs text-gray-500 max-w-3xl leading-relaxed">
+                    We never hold your login credentials or third-party API keys. Use these direct handoff links to open your preferred destination, sign in with your own personal or artist account, and upload your downloaded studio master directly from your source to theirs.
+                  </p>
+                </div>
+                <span className="text-xs font-mono text-emerald-700 font-semibold shrink-0">
+                  100% Creator-Owned Login
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                {TOP_HANDOFF_PLATFORMS.map((plat, idx) => (
+                  <div
+                    key={plat.id}
+                    className="p-4 rounded-2xl bg-gray-50/80 border border-gray-200/80 flex flex-col justify-between gap-3"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
+                        <span className="font-mono font-bold text-gray-400 tabular-nums">
+                          #{idx + 1}
+                        </span>
+                        <span className="truncate">{plat.category}</span>
+                      </div>
+                      <h3 className="text-sm font-bold text-gray-900">{plat.name}</h3>
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        {plat.loginNote}
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-gray-200/60 flex items-center justify-between gap-2">
+                      <a
+                        href={plat.handoffUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-2 px-3 rounded-xl bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold text-center transition-colors whitespace-nowrap"
+                      >
+                        Handoff to {plat.name} ↗
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </section>
         )}
 
@@ -1814,14 +1950,17 @@ const App: React.FC = () => {
         {/* ===================================================================== */}
         {activeTab === 'podcasts' && (
           <section className="bg-white rounded-[36px] p-8 md:p-10 card-shadow border border-gray-200/80 mb-12 space-y-8">
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <span className="text-xs text-gray-600 font-geist px-4 py-1.5 bg-gradient-to-tr from-zinc-300/10 via-gray-400/10 to-transparent border-[2px] border-gray-300/30 rounded-3xl w-fit tracking-tight uppercase inline-flex items-center">
+                Weekly Cadence · 5 to 10 Minutes Max
+              </span>
               <h1
-                className="text-3xl md:text-4xl font-extrabold tracking-tight text-gray-900"
+                className="bg-gradient-to-br from-black from-30% to-black/40 bg-clip-text text-3xl md:text-5xl font-semibold tracking-tighter text-transparent py-1"
                 style={{ textWrap: 'balance' }}
               >
                 Scheduled Mini-Podcast Studio (5 to 10 Minutes Max)
               </h1>
-              <p className="text-sm text-gray-500 max-w-3xl leading-relaxed">
+              <p className="text-sm md:text-base text-gray-600 max-w-3xl leading-relaxed tracking-tight">
                 Designed for high-value, consistent weekly episodes between 5 and 10 minutes—never 15 two-minute spam clips a day. Includes dual-host conversational synthesis and 1080p podcast video rendering for Spotify, YouTube, and Amazon Music.
               </p>
             </div>
@@ -2001,14 +2140,17 @@ const App: React.FC = () => {
         {/* ===================================================================== */}
         {activeTab === 'commercials' && (
           <section className="bg-white rounded-[36px] p-8 md:p-10 card-shadow border border-gray-200/80 mb-12 space-y-8">
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <span className="text-xs text-gray-600 font-geist px-4 py-1.5 bg-gradient-to-tr from-zinc-300/10 via-gray-400/10 to-transparent border-[2px] border-gray-300/30 rounded-3xl w-fit tracking-tight uppercase inline-flex items-center">
+                Authentic Advertising Craft · PG Broadcast Standards
+              </span>
               <h1
-                className="text-3xl md:text-4xl font-extrabold tracking-tight text-gray-900"
+                className="bg-gradient-to-br from-black from-30% to-black/40 bg-clip-text text-3xl md:text-5xl font-semibold tracking-tighter text-transparent py-1"
                 style={{ textWrap: 'balance' }}
               >
                 True Craft Commercial Studio
               </h1>
-              <p className="text-sm text-gray-500 max-w-3xl leading-relaxed">
+              <p className="text-sm md:text-base text-gray-600 max-w-3xl leading-relaxed tracking-tight">
                 Dedicated to the real craft of radio and broadcast advertising—memorable copywriting, sonic branding, and clear storytelling. Strictly zero fake celebrity avatars or deceptive impersonations, with built-in PG / Family-Safe broadcast standards.
               </p>
             </div>
@@ -2401,11 +2543,14 @@ const App: React.FC = () => {
                           </button>
 
                           <button
-                            onClick={() => setPublishTargetResult(result)}
+                            onClick={() => {
+                              setHandoffNotice(null);
+                              setPublishTargetResult(result);
+                            }}
                             className="px-3.5 py-1.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0"
                           >
                             <Icons.Share className="w-3.5 h-3.5" />
-                            <span>Publish to Spotify / YouTube / Amazon</span>
+                            <span>Handoff Link (Top 10 Platforms)</span>
                           </button>
 
                           <button
@@ -2688,7 +2833,7 @@ const App: React.FC = () => {
       </main>
 
       {/* ===================================================================== */}
-      {/* MODAL 1: PUBLISH & SYNDICATE TO SPOTIFY, YOUTUBE, AMAZON MUSIC        */}
+      {/* MODAL 1: DIRECT CREATOR HANDOFF LINKS (TOP 10 PLATFORMS, ZERO KEYS)   */}
       {/* ===================================================================== */}
       {publishTargetResult && (
         <div
@@ -2696,111 +2841,157 @@ const App: React.FC = () => {
           onClick={() => setPublishTargetResult(null)}
         >
           <div
-            className="bg-white rounded-[32px] max-w-xl w-full p-8 card-shadow border border-gray-200 space-y-6"
+            className="bg-white rounded-[32px] max-w-3xl w-full p-8 card-shadow border border-gray-200 space-y-6 max-h-[88vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">
-              <div>
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-blue-600">
+                  Direct Creator Handoff · Zero Stored Logins or API Keys
+                </div>
                 <h3 className="text-2xl font-extrabold text-gray-900">
-                  Publish & Syndicate Creation
+                  Handoff "{publishTargetResult.title}" to Your Own Accounts
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  Push "{publishTargetResult.title}" to major listening platforms with verified AI/Human origin metadata and duration compliance.
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Tell Them Studio never holds your platform credentials or API keys. Prepare your source files below, then click any of the Top 10 Handoff Links to sign in with your own account and upload as the publisher.
                 </p>
               </div>
               <button
                 onClick={() => setPublishTargetResult(null)}
-                className="p-2 rounded-full bg-gray-100 text-gray-600 hover:text-gray-900"
+                className="p-2 rounded-full bg-gray-100 text-gray-600 hover:text-gray-900 shrink-0"
               >
                 <Icons.X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Pre-Flight Compliance Summary */}
-            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-2 text-xs text-gray-700">
-              <div className="flex items-center justify-between">
-                <span>Duration Guardrail:</span>
+            {handoffNotice && (
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 font-medium flex items-center justify-between gap-3">
+                <span>{handoffNotice}</span>
+                <button
+                  onClick={() => setHandoffNotice(null)}
+                  className="text-emerald-700 font-bold hover:underline shrink-0"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
+            {/* Step 1: Source Package & Pre-Flight Compliance Summary */}
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-3 text-xs text-gray-700">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-bold text-gray-900">
+                  Step 1 — Grab Your Studio Source & Release Metadata:
+                </span>
                 <span className="font-mono font-bold text-emerald-700 tabular-nums">
-                  {publishTargetResult.maxCapLabel} (Verified)
+                  {publishTargetResult.maxCapLabel} · {publishTargetResult.originType}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span>Artist Respect & Origin Identifier:</span>
-                <span className="font-semibold text-gray-900">
-                  {publishTargetResult.originType}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Creator Handle Attribution:</span>
-                <span className="font-mono text-blue-600">
-                  {publishTargetResult.creatorHandle}
-                </span>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleDownloadHandoffPackage(publishTargetResult)}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <Icons.Download className="w-3.5 h-3.5" />
+                  <span>Download WAV + Handoff Manifest</span>
+                </button>
+                <button
+                  onClick={() => handleCopyHandoffMetadata(publishTargetResult)}
+                  className="px-3.5 py-2 rounded-xl bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 font-semibold whitespace-nowrap"
+                >
+                  Copy Release Credits & Lyrics
+                </button>
+                <button
+                  onClick={() => onDownloadVideo(publishTargetResult, true)}
+                  disabled={encodingVideoId === publishTargetResult.id}
+                  className="px-3.5 py-2 rounded-xl bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 font-semibold flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <Icons.Video className="w-3.5 h-3.5 text-purple-600" />
+                  <span>
+                    {encodingVideoId === publishTargetResult.id
+                      ? `Rendering Video ${Math.round(encodingProgress)}%`
+                      : 'Export 1080p Video for YouTube'}
+                  </span>
+                </button>
               </div>
             </div>
 
+            {/* Step 2: Top 10 Destination Handoff Links */}
             <div className="space-y-3">
-              <label className="block text-xs font-bold text-gray-700">
-                Select Destination Platforms to Push Release Package
-              </label>
-              {(
-                [
-                  {
-                    name: 'Spotify',
-                    desc: 'Spotify for Artists & Spotify for Podcasters (Audio + Canvas/Video)',
-                  },
-                  {
-                    name: 'YouTube',
-                    desc: 'YouTube Music & YouTube Studio (1080p Reactive Spectrum / Lyric Video)',
-                  },
-                  {
-                    name: 'Amazon Music',
-                    desc: 'Amazon Music for Artists & Podcasters Distribution Feed',
-                  },
-                  {
-                    name: 'Apple Podcasts',
-                    desc: 'Apple Music & Weekly Scheduled Podcast RSS Feed',
-                  },
-                ] as const
-              ).map((plat) => {
-                const isPublished = publishTargetResult.publishedPlatforms.includes(
-                  plat.name
-                );
-                return (
-                  <div
-                    key={plat.name}
-                    className="flex items-center justify-between p-3.5 rounded-2xl border border-gray-200 bg-white"
-                  >
-                    <div>
-                      <div className="text-sm font-bold text-gray-900">{plat.name}</div>
-                      <div className="text-xs text-gray-500">{plat.desc}</div>
-                    </div>
-                    <button
-                      onClick={() =>
-                        handleSyndicateToggle(publishTargetResult.id, plat.name)
-                      }
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
-                        isPublished
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-gray-900 text-white hover:bg-gray-800'
-                      }`}
+              <div className="flex items-center justify-between gap-2">
+                <label className="block text-xs font-bold text-gray-800">
+                  Step 2 — Launch Direct Handoff Link (Top 10 Music & Podcast Destinations)
+                </label>
+                <span className="text-xs text-gray-500">
+                  Copies metadata & opens official creator login in a new tab
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {TOP_HANDOFF_PLATFORMS.map((plat, index) => {
+                  const isPublished = publishTargetResult.publishedPlatforms.includes(
+                    plat.name
+                  );
+                  return (
+                    <div
+                      key={plat.id}
+                      className="flex flex-col justify-between p-4 rounded-2xl border border-gray-200 bg-white gap-3"
                     >
-                      {isPublished ? 'Published ✓' : 'Push to Platform'}
-                    </button>
-                  </div>
-                );
-              })}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-bold text-gray-900">
+                            {index + 1}. {plat.name}
+                          </span>
+                          <span className="text-xs text-gray-500 font-medium">
+                            {plat.category}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 leading-relaxed">
+                          {plat.loginNote}
+                        </p>
+                        <div className="text-[11px] font-mono text-gray-500">
+                          Accepts: {plat.acceptedFormats}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                        <a
+                          href={plat.handoffUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => {
+                            handleCopyHandoffMetadata(publishTargetResult, plat.name);
+                            if (!isPublished) {
+                              handleSyndicateToggle(publishTargetResult.id, plat.name);
+                            }
+                          }}
+                          className="flex-1 py-2 px-3 rounded-xl bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold text-center transition-colors whitespace-nowrap"
+                        >
+                          Open {plat.name} Handoff ↗
+                        </a>
+                        <button
+                          onClick={() =>
+                            handleSyndicateToggle(publishTargetResult.id, plat.name)
+                          }
+                          className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors whitespace-nowrap ${
+                            isPublished
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          {isPublished ? 'Handed Off ✓' : 'Mark Done'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => handleDownload(publishTargetResult)}
-                className="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-800"
-              >
-                Download Distribution WAV
-              </button>
+            <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
               <button
                 onClick={() => setPublishTargetResult(null)}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold"
+                className="px-6 py-2.5 rounded-xl bg-gray-900 text-white text-xs font-bold"
               >
                 Done
               </button>

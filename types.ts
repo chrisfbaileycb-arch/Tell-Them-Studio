@@ -93,6 +93,28 @@ export interface CommercialFrame {
   audioCue: string;
 }
 
+export type DistributionPlatformName =
+  | 'Spotify'
+  | 'YouTube Music'
+  | 'YouTube'
+  | 'Amazon Music'
+  | 'Apple Music & Podcasts'
+  | 'SoundCloud'
+  | 'Bandcamp'
+  | 'TIDAL'
+  | 'iHeartRadio'
+  | 'Audiomack'
+  | 'Apple Podcasts';
+
+export interface HandoffPlatformInfo {
+  id: string;
+  name: DistributionPlatformName;
+  category: string;
+  handoffUrl: string;
+  loginNote: string;
+  acceptedFormats: string;
+}
+
 export interface SongResult {
   id: string;
   itemType?: 'song' | 'podcast' | 'commercial';
@@ -117,7 +139,7 @@ export interface SongResult {
   isExpanded: boolean;
   thumbsUp: number;
   praiseList: PraiseComment[];
-  publishedPlatforms: ('Spotify' | 'YouTube' | 'Amazon Music' | 'Apple Podcasts')[];
+  publishedPlatforms: DistributionPlatformName[];
   // Podcast specific fields
   podcastSchedule?: {
     dayOfWeek: string;
@@ -151,7 +173,7 @@ export interface RadioStation {
   coverSvgUrl: string;
   listenersCount: number;
   thumbsUp: number;
-  syndicatedTo: ('Spotify' | 'YouTube' | 'Amazon Music')[];
+  syndicatedTo: DistributionPlatformName[];
   trackIds: string[];
   praiseComments: PraiseComment[];
 }

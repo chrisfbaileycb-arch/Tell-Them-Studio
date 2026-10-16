@@ -5,6 +5,7 @@ import React from 'react';
 import {
   BandArchetype,
   ExampleSong,
+  HandoffPlatformInfo,
   HolidayTemplate,
   RadioStation,
   SongResult,
@@ -210,7 +211,7 @@ export const INITIAL_COMMUNITY_SONGS: SongResult[] = [
     timestamp: new Date(Date.now() - 3600 * 1000 * 5),
     isExpanded: false,
     thumbsUp: 48,
-    publishedPlatforms: ['Spotify', 'YouTube', 'Amazon Music'],
+    publishedPlatforms: ['Spotify', 'YouTube Music', 'YouTube', 'Amazon Music'],
     praiseList: [
       {
         id: 'p1',
@@ -256,7 +257,7 @@ export const INITIAL_COMMUNITY_SONGS: SongResult[] = [
     timestamp: new Date(Date.now() - 3600 * 1000 * 12),
     isExpanded: false,
     thumbsUp: 63,
-    publishedPlatforms: ['Spotify', 'Amazon Music'],
+    publishedPlatforms: ['Spotify', 'YouTube Music', 'SoundCloud', 'Amazon Music'],
     praiseList: [
       {
         id: 'p3',
@@ -316,6 +317,89 @@ export const INITIAL_RADIO_STATIONS: RadioStation[] = [
         timestamp: '5h ago',
       },
     ],
+  },
+];
+
+export const TOP_HANDOFF_PLATFORMS: HandoffPlatformInfo[] = [
+  {
+    id: 'handoff-spotify',
+    name: 'Spotify',
+    category: 'Music & Podcasts',
+    handoffUrl: 'https://artists.spotify.com',
+    loginNote: 'Sign in with your own Spotify for Artists / Creators account to upload your track or weekly podcast.',
+    acceptedFormats: 'Master WAV, Cover Art, Canvas / 1080p Video',
+  },
+  {
+    id: 'handoff-youtube-music',
+    name: 'YouTube Music',
+    category: 'Music Streaming & Releases',
+    handoffUrl: 'https://music.youtube.com',
+    loginNote: 'Sign in with your own Google / YouTube Artist account to publish tracks & albums to YouTube Music.',
+    acceptedFormats: 'Master WAV, 1080p Spectrum / Lyric Video, Art Track',
+  },
+  {
+    id: 'handoff-youtube',
+    name: 'YouTube',
+    category: 'Video, Podcasts & Radio Streams',
+    handoffUrl: 'https://studio.youtube.com',
+    loginNote: 'Authenticate directly in your own YouTube Studio channel—no API keys shared with us.',
+    acceptedFormats: '1080p WebM/MP4 Video, Lyric Video, 5–10m Podcast Video',
+  },
+  {
+    id: 'handoff-amazon-music',
+    name: 'Amazon Music',
+    category: 'Music & Podcasts',
+    handoffUrl: 'https://artists.amazonmusic.com',
+    loginNote: 'Log in directly to your Amazon Music for Artists or Podcasters portal to submit your release.',
+    acceptedFormats: 'Master WAV, Podcast Episode Audio, Cover Art',
+  },
+  {
+    id: 'handoff-apple-music',
+    name: 'Apple Music & Podcasts',
+    category: 'Music & Weekly Podcasts',
+    handoffUrl: 'https://artists.apple.com',
+    loginNote: 'Use your own Apple ID in Apple Music for Artists or Apple Podcasts Connect.',
+    acceptedFormats: '24-bit/16-bit WAV, Square Cover Art, Podcast Feed',
+  },
+  {
+    id: 'handoff-soundcloud',
+    name: 'SoundCloud',
+    category: 'Direct Indie & Radio Upload',
+    handoffUrl: 'https://soundcloud.com/upload',
+    loginNote: 'Log in to your personal SoundCloud account and drop your downloaded Studio WAV directly.',
+    acceptedFormats: 'Lossless WAV, Track Metadata, Handle Tags',
+  },
+  {
+    id: 'handoff-bandcamp',
+    name: 'Bandcamp',
+    category: 'Direct-to-Fan Band Releases',
+    handoffUrl: 'https://bandcamp.com/artists',
+    loginNote: 'Sign in to your own Bandcamp artist page to upload 3:50 band singles and lyric sheets.',
+    acceptedFormats: 'Lossless WAV, High-Res Square Cover, Lyrics',
+  },
+  {
+    id: 'handoff-tidal',
+    name: 'TIDAL',
+    category: 'HiFi Artist Releases',
+    handoffUrl: 'https://artists.tidal.com',
+    loginNote: 'Authenticate with your own TIDAL Artist Home account to manage and publish studio masters.',
+    acceptedFormats: 'Master WAV, Track Credits & Origin Identifier',
+  },
+  {
+    id: 'handoff-iheart',
+    name: 'iHeartRadio',
+    category: 'Radio Shows & Mini-Podcasts',
+    handoffUrl: 'https://podcasters.iheart.com',
+    loginNote: 'Sign in with your own iHeartRadio creator credentials to submit scheduled weekly shows.',
+    acceptedFormats: '5–10m Weekly Podcast Audio, Show Notes',
+  },
+  {
+    id: 'handoff-audiomack',
+    name: 'Audiomack',
+    category: 'Direct Creator Upload',
+    handoffUrl: 'https://audiomack.com/upload',
+    loginNote: 'Log in to your own Audiomack Creator account for instant direct track and station uploads.',
+    acceptedFormats: 'Master WAV, Cover Art, Genre & Handle Metadata',
   },
 ];
 

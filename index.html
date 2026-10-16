@@ -8,50 +8,82 @@
     <meta name="description" content="A trend-setting social creation studio for building custom radio stations, multi-singer band tracks (up to 3:50), scheduled 5–10 minute mini-podcasts, genuine craft commercials, and seasonal holiday hits ready to publish to Spotify, YouTube, and Amazon Music.">
     <meta property="og:title" content="Tell Them Studio">
     <meta property="og:description" content="A trend-setting social creation studio for building custom radio stations, multi-singer band tracks (up to 3:50), scheduled 5–10 minute mini-podcasts, genuine craft commercials, and seasonal holiday hits ready to publish to Spotify, YouTube, and Amazon Music.">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --background: 0 0% 100%;
+        }
         body {
-            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background-color: #fbfbfd;
-            color: #1d1d1f;
+            font-family: 'Geist', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background-color: #ffffff;
+            color: #09090b;
+        }
+        .font-geist {
+            font-family: 'Geist', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        @keyframes fade-in {
+            0% {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @keyframes fade-up {
+            0% {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-fade-in {
+            animation: fade-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-fade-up {
+            animation: fade-up 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .glass {
-            background: rgba(255, 255, 255, 0.72);
+            background: rgba(255, 255, 255, 0.82);
             backdrop-filter: saturate(180%) blur(20px);
         }
         .apple-gradient {
-            background: linear-gradient(135deg, #007aff 0%, #00c6ff 100%);
+            background: linear-gradient(135deg, #09090b 0%, #27272a 100%);
         }
         .creative-gradient {
-            background: linear-gradient(135deg, #ff3b30 0%, #ff9500 100%);
+            background: linear-gradient(135deg, #18181b 0%, #3f3f46 100%);
         }
         .music-gradient {
-            background: linear-gradient(135deg, #af52de 0%, #ff2d55 100%);
+            background: linear-gradient(135deg, #09090b 0%, #3b0764 100%);
         }
         .card-shadow {
             box-shadow: 0 4px 24px rgba(0,0,0,0.04);
         }
         .card-shadow:hover {
-            box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+            box-shadow: 0 10px 34px rgba(0,0,0,0.07);
         }
-        input:focus, textarea:focus {
+        input:focus, textarea:focus, select:focus {
             outline: none;
-            border-color: #007aff;
-            box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+            border-color: #18181b;
+            box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
         }
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #f1f1f1;
+            background: #f4f4f5;
         }
         ::-webkit-scrollbar-thumb {
-            background: #ccc;
+            background: #d4d4d8;
             border-radius: 10px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #aaa;
+            background: #a1a1aa;
         }
     </style>
 

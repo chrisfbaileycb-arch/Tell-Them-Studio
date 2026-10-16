@@ -224,20 +224,23 @@ export const TrendingView: React.FC<TrendingViewProps> = ({
   return (
     <section className="space-y-12 mb-14">
       {/* Header & Summary KPI Strip */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="space-y-2">
+      <div className="hero-surface-card rounded-3xl p-8 md:p-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="relative z-10 space-y-3">
+          <span className="text-xs text-gray-600 font-geist px-4 py-1.5 bg-gradient-to-tr from-zinc-300/10 via-gray-400/10 to-transparent border-[2px] border-gray-300/30 rounded-3xl w-fit tracking-tight uppercase inline-flex items-center">
+            7-Day Community Pulse · Analytics & Specialty Hubs
+          </span>
           <h1
-            className="text-3xl md:text-4xl font-extrabold tracking-tight text-gray-900"
+            className="bg-gradient-to-br from-black from-30% to-black/40 bg-clip-text text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tighter text-transparent leading-none py-1"
             style={{ textWrap: 'balance' }}
           >
             Weekly Community Trends & Specialty Hubs
           </h1>
-          <p className="text-sm text-gray-500 max-w-3xl leading-relaxed">
+          <p className="text-sm md:text-base text-gray-600 max-w-3xl leading-relaxed tracking-tight">
             Real-time 7-day pulse of the most popular band genres, singer arrangements, and acoustic sessions—followed below by the Seasonal Holiday Hub and our rotating community creation hubs.
           </p>
         </div>
 
-        <div className="text-xs text-gray-500 font-mono tabular-nums shrink-0">
+        <div className="relative z-10 text-xs text-gray-500 font-mono tabular-nums shrink-0">
           Window: Last 7 Days · All Songs ≤ 3:50 (Jingles Separate)
         </div>
       </div>
@@ -588,14 +591,14 @@ export const TrendingView: React.FC<TrendingViewProps> = ({
       {/* ===================================================================== */}
       <div className="pt-6 border-t border-gray-200/80 space-y-6">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="text-xs font-semibold text-orange-600">
+          <div className="space-y-2">
+            <span className="text-xs text-gray-600 font-geist px-4 py-1.5 bg-gradient-to-tr from-zinc-300/10 via-gray-400/10 to-transparent border-[2px] border-gray-300/30 rounded-3xl w-fit tracking-tight uppercase inline-flex items-center">
               Seasonal Hub Under Trending
-            </div>
-            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900">
+            </span>
+            <h2 className="bg-gradient-to-br from-black from-30% to-black/40 bg-clip-text text-2xl md:text-3xl font-semibold tracking-tighter text-transparent">
               Holiday Hub: Seasonal Music & Radio Workshop
             </h2>
-            <p className="text-sm text-gray-500 max-w-2xl">
+            <p className="text-sm text-gray-600 max-w-2xl tracking-tight">
               Tucked underneath Trending for when holidays roll around—grab last-minute Halloween party band templates or prep early-bird Christmas & winter radio singles.
             </p>
           </div>
@@ -673,11 +676,11 @@ export const TrendingView: React.FC<TrendingViewProps> = ({
       {/* ===================================================================== */}
       <div className="pt-6 border-t border-gray-200/80 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-extrabold tracking-tight text-gray-900">
+          <div className="space-y-1.5">
+            <h2 className="bg-gradient-to-br from-black from-30% to-black/40 bg-clip-text text-2xl font-semibold tracking-tighter text-transparent">
               More Community & Creation Hubs
             </h2>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-600 tracking-tight">
               Rotated underneath Trending so year-round band, singer, and acoustic creation stays front and center at the top.
             </p>
           </div>
