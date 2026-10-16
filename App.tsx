@@ -1,3 +1,6 @@
+import { MusicStudio } from './src/components/MusicStudio';
+import { AudioLines, Music2, Mic, Megaphone, Sparkles } from 'lucide-react';
+import './src/components/studio.css';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   BandArchetype,
@@ -78,7 +81,7 @@ const App: React.FC = () => {
     if (preset === 'acoustic') { handleSelectBandArchetype('Indie'); setVocalArrangement('Dual Female Lead & Harmony'); }
     if (preset === 'bands') handleSelectBandArchetype('Rock Band');
     if (preset === 'jingle') { setDuration('0:30 Hook / Jingle'); setPrompt('Create a short, memorable original jingle for my business. Include the brand name, one clear benefit, and a catchy closing hook.'); setIsHelperOpen(false); }
-    else setDuration('3:50 Radio Master (Max)');
+    else setDuration('2:48 Radio Single');
   };
 
   // Creator Handle (Safe handle-only identity, no personal info)
@@ -94,10 +97,10 @@ const App: React.FC = () => {
     'Multi-Singer Trade-Off (Male & Female)'
   );
   const [prompt, setPrompt] = useDraft('prompt',
-    'Create an upbeat, radio-ready Rock Band song with male and female singers trading verses and harmonizing on an anthemic hometown pride chorus.'
+    'An explosive indie-rock anthem with gritty guitars, driving drums, and a soaring duet chorus.'
   );
   const [isPromptManual, setIsPromptManual] = useDraft('isPromptManual', false);
-  const [duration, setDuration] = useDraft<Duration>('duration', '3:50 Radio Master (Max)');
+  const [duration, setDuration] = useDraft<Duration>('duration', '2:48 Radio Single');
   const [lyricsOption, setLyricsOption] = useDraft<LyricsOption>('lyricsOption', 'Auto');
   const [customLyrics, setCustomLyrics] = useDraft('customLyrics', '');
   const [selectedImages, setSelectedImages] = useState<
@@ -909,17 +912,9 @@ const App: React.FC = () => {
   return (
     <div
       id="top"
-      className="min-h-screen flex flex-col pb-24 overflow-x-hidden bg-[linear-gradient(to_bottom,#ffffff,#ffffff_55%,#f4f4f6_100%)] text-[#09090b] font-geist relative"
+      className="studio-app min-h-screen flex flex-col pb-24 font-geist relative"
       onClick={() => setActiveSelector(null)}
     >
-      {/* Subtle Top Grid Backdrop across the site */}
-      <div
-        className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[560px] opacity-75
-        bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)]
-        bg-[size:6rem_5rem]
-        [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]"
-      />
-
       {/* Top Navigation Bar — Strict 3-Zone Contract */}
       <header className="sticky top-0 z-50 glass border-b border-gray-200/70 min-h-16 py-3 flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6">
         {/* Zone 1: Single text element wordmark */}
@@ -929,16 +924,16 @@ const App: React.FC = () => {
             e.preventDefault();
             setActiveTab('bands');
           }}
-          className="text-lg font-bold tracking-tighter text-gray-950 whitespace-nowrap shrink-0"
+          className="studio-wordmark"
         >
-          Tell Them Studio
+          <AudioLines size={36} strokeWidth={2.3} aria-hidden="true" />Tell Them Studio
         </a>
 
         <nav aria-label="Main navigation" className="order-3 w-full sm:order-none sm:w-auto flex flex-wrap gap-2 text-sm">
           {[
             { label: 'Create', tab: 'bands', active: isCreate },
             { label: 'My Library', tab: 'library', active: activeTab === 'library' },
-            { label: 'Told Them · Listen', tab: 'listen', active: !isCreate && activeTab !== 'library' },
+            { label: 'Listen', tab: 'listen', active: !isCreate && activeTab !== 'library' },
           ].map(item => <button key={item.tab} aria-current={item.active ? 'page' : undefined}
             onClick={() => setActiveTab(item.tab as StudioTab)}
             className={`rounded-xl px-3 py-2 font-semibold ${item.active ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{item.label}</button>)}
@@ -950,14 +945,14 @@ const App: React.FC = () => {
             onClick={() => setIsStandardsModalOpen(true)}
             className="px-4 py-2 text-xs font-semibold text-white bg-zinc-950 rounded-xl hover:bg-zinc-900 transition-colors whitespace-nowrap shrink-0"
           >
-            Studio guidelines
+            Guidelines
           </button>
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 pt-8">
+      <main className="studio-main flex-1 mx-auto w-full">
         {/* Workspace Toolbar: Handle Identity, Mobile Tab Switcher & Core Standards */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-6 mb-8 border-b border-gray-200/70">
+        <div className="studio-identity flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
             <span className="font-semibold text-gray-900">Creator Handle:</span>
             {isEditingHandle ? (
@@ -1000,17 +995,17 @@ const App: React.FC = () => {
         {draftError && <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm">Draft saving is unavailable or storage is full. Keep this page open and copy your text before leaving.</p>}
         {activeTab !== 'library' && <nav aria-label={isCreate ? 'Creation tools' : 'Listening tools'} className="mb-6 flex flex-wrap gap-2">
           {(isCreate ? [
-            { id: 'bands', label: 'Music & jingles' },
+            { id: 'bands', label: 'Music' },
             { id: 'podcasts', label: 'Podcasts' },
             { id: 'commercials', label: 'Commercials' },
             { id: 'creative', label: 'Creative assistant' },
-            { id: 'holidays', label: 'Seasonal templates' },
+
           ] : [
             { id: 'listen', label: 'Discover' },
             { id: 'stations', label: 'Radio preview' },
             { id: 'trending', label: 'Featured demos' },
           ]).map(item => <button key={item.id} aria-current={activeTab === item.id ? 'page' : undefined} onClick={() => setActiveTab(item.id as StudioTab)}
-            className={`rounded-xl border px-4 py-2 text-sm ${activeTab === item.id ? 'border-gray-900 bg-gray-100 font-semibold' : 'border-gray-200'}`}>{item.label}</button>)}
+            className={`rounded-xl border px-4 py-2 text-sm ${activeTab === item.id ? 'border-gray-900 bg-gray-100 font-semibold' : 'border-gray-200'}`}>{item.id === 'bands' ? <Music2 size={21} /> : item.id === 'podcasts' ? <Mic size={21} /> : item.id === 'commercials' ? <Megaphone size={21} /> : item.id === 'creative' ? <Sparkles size={21} /> : null}{item.label}</button>)}
         </nav>}
         {['listen', 'stations', 'trending'].includes(activeTab) && <p className="mb-4 text-sm text-gray-600">Local listening preview · demo activity and this browser’s shared tracks. Nothing is published online.</p>}
 
@@ -1042,447 +1037,29 @@ const App: React.FC = () => {
         {/* ===================================================================== */}
         {/* TAB 1: BAND STUDIO, SINGER STUDIO & ACOUSTIC STUDIO                   */}
         {/* ===================================================================== */}
-        {activeTab === 'bands' && (
-          <>
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold">Music & jingles</h1>
-              <p className="mt-2 text-sm text-gray-600">Start with your idea. Adjust the sound, generate, then review and save or export.</p>
-              <div role="group" aria-label="Music presets" className="mt-4 flex flex-wrap gap-2">
-                {[['bands', 'Band'], ['singers', 'Vocals'], ['acoustic', 'Acoustic'], ['jingle', 'Jingle · 30 seconds']].map(([id, label]) =>
-                  <button key={id} aria-pressed={musicPreset === id} onClick={() => selectMusicPreset(id)} className={`rounded-xl border px-4 py-2 text-sm ${musicPreset === id ? 'bg-gray-900 text-white' : 'bg-white'}`}>{label}</button>)}
-              </div>
-            </div>
-            <details className="mb-4"><summary className="cursor-pointer text-sm font-semibold">Preset inspiration</summary>
-              {musicPreset === 'singers' && (
-                <div className="pt-2 flex flex-wrap justify-center gap-2">
-                  {[
-                    {
-                      label: 'Male & Female Duet Spotlight',
-                      band: 'Pop Band' as BandArchetype,
-                      vox: 'Multi-Singer Trade-Off (Male & Female)' as VocalArrangement,
-                      brief:
-                        'Create a vocal-forward Pop & Soul duet where male and female singers trade expressive verses and blend in a soaring chorus. Up to 3:50.',
-                    },
-                    {
-                      label: 'Powerhouse Female Lead',
-                      band: 'Pop Band' as BandArchetype,
-                      vox: 'Lead Female + Band Backing' as VocalArrangement,
-                      brief:
-                        'Create an uplifting song showcasing a powerhouse female lead vocalist with rich backing harmonies and dynamic studio arrangement. Up to 3:50.',
-                    },
-                    {
-                      label: 'Warm Male Storyteller Lead',
-                      band: 'Country Band' as BandArchetype,
-                      vox: 'Lead Male + Band Backing' as VocalArrangement,
-                      brief:
-                        'Create a heartfelt Country & Americana track featuring a warm male lead singer and tight chorus harmony. Up to 3:50.',
-                    },
-                    {
-                      label: '3-Part Vocal Harmony Group',
-                      band: 'Disco Band' as BandArchetype,
-                      vox: '3-Part Band Harmonies' as VocalArrangement,
-                      brief:
-                        'Create an energetic 3-part vocal harmony track with tight call-and-response hooks and vibrant rhythm section. Up to 3:50.',
-                    },
-                    {
-                      label: 'Backing Track for My Own Voice',
-                      band: 'Singer-Free Instrumental' as BandArchetype,
-                      vox: 'Singer-Free (Record Your Own Voice)' as VocalArrangement,
-                      brief:
-                        'Create a studio backing arrangement with clear vocal pocket headroom designed for a human singer to record live vocals over. Up to 3:50.',
-                    },
-                  ].map((preset) => (
-                    <button
-                      key={preset.label}
-                      onClick={() => {
-                        handleSelectBandArchetype(preset.band);
-                        setVocalArrangement(preset.vox);
-                        setPrompt(preset.brief);
-                        setIsHelperOpen(false);
-                      }}
-                      className="px-4 py-2 rounded-3xl bg-white/90 border border-gray-300/60 hover:border-gray-950 text-xs font-semibold text-gray-800 shadow-sm transition-colors"
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {musicPreset === 'acoustic' && (
-                <div className="pt-2 flex flex-wrap justify-center gap-2">
-                  {[
-                    {
-                      label: 'Fingerstyle Acoustic Guitar & Duet',
-                      band: 'Indie' as BandArchetype,
-                      vox: 'Multi-Singer Trade-Off (Male & Female)' as VocalArrangement,
-                      brief:
-                        'Create an intimate unplugged acoustic session featuring warm fingerstyle flattop guitar, upright bass, and male & female duet harmonies. Up to 3:50.',
-                    },
-                    {
-                      label: 'Grand Piano & Intimate Vocal',
-                      band: 'Serenity' as BandArchetype,
-                      vox: 'Lead Female + Band Backing' as VocalArrangement,
-                      brief:
-                        'Create a stripped-back acoustic grand piano and warm cello arrangement with an expressive, close-mic lead vocal. Up to 3:50.',
-                    },
-                    {
-                      label: 'Front Porch Country Acoustic',
-                      band: 'Country Band' as BandArchetype,
-                      vox: 'Dual Male Lead & Harmony' as VocalArrangement,
-                      brief:
-                        'Create a warm acoustic flattop guitar, mandolin, and upright bass porch session with close vocal harmonies. Up to 3:50.',
-                    },
-                    {
-                      label: 'Unplugged Instrumental Guitar',
-                      band: 'Singer-Free Instrumental' as BandArchetype,
-                      vox: 'Singer-Free (Record Your Own Voice)' as VocalArrangement,
-                      brief:
-                        'Create a pure unplugged acoustic guitar and light percussion instrumental backing track ready for a singer-songwriter. Up to 3:50.',
-                    },
-                  ].map((preset) => (
-                    <button
-                      key={preset.label}
-                      onClick={() => {
-                        handleSelectBandArchetype(preset.band);
-                        setVocalArrangement(preset.vox);
-                        setPrompt(preset.brief);
-                        setIsHelperOpen(false);
-                      }}
-                      className="px-4 py-2 rounded-3xl bg-white/90 border border-gray-300/60 hover:border-gray-950 text-xs font-semibold text-gray-800 shadow-sm transition-colors"
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </details>
-
-            <section id="studio-workspace" className="bg-white rounded-[36px] p-8 md:p-10 card-shadow border border-gray-200/80 mb-12 relative z-10">
-              <div className="space-y-8">
-                {/* Step 3: Prompt Builder / Free Text */}
-                <div className="space-y-3">
-                  <div className="flex flex-wrap justify-between items-center gap-2">
-                    <label className="text-sm font-bold text-gray-900">
-                      1. Describe your idea
-                    </label>
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => {
-                          setPrompt(
-                            'Create an upbeat Rock Band hometown football pride anthem in black and gold with male and female singers trading verses and an electric stadium chorus. Use 100% original royalty-safe lyrics celebrating our city rivers, steel bridges, and Friday night energy.'
-                          );
-                          setIsHelperOpen(false);
-                        }}
-                        className="text-xs font-semibold text-gray-600 hover:text-blue-600 transition-colors"
-                      >
-                        Load Royalty-Safe Hometown Anthem Example
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsHelperOpen(!isHelperOpen);
-                        }}
-                        className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1.5"
-                      >
-                        <Icons.Sparkles className="w-3.5 h-3.5" />
-                        {isHelperOpen ? 'Switch to Free Text' : 'Guided Song Builder'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="relative group/prompt min-h-[150px]">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleImageUpload}
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                    />
-                    {isHelperOpen ? (
-                      <PromptBuilder
-                        isHelperOpen={isHelperOpen}
-                        helperSections={helperSections}
-                        setHelperSections={setHelperSections}
-                        activeSelector={activeSelector}
-                        setActiveSelector={setActiveSelector}
-                        selectedImages={selectedImages}
-                        onImageSelect={() => fileInputRef.current?.click()}
-                        onImageRemove={removeImage}
-                      />
-                    ) : (
-                      <div className="relative">
-                        <textarea
-                          aria-label="Creative brief"
-                          ref={promptTextareaRef}
-                          value={prompt}
-                          onChange={(e) => {
-                            setPrompt(e.target.value);
-                            setIsPromptManual(true);
-                          }}
-                          onKeyDown={handleKeyDown}
-                          placeholder="Describe your band's groove, how the male and female singers trade verses, or the hometown story..."
-                          className="w-full min-h-[128px] bg-gray-50 border border-gray-200 rounded-3xl p-6 pb-20 text-lg font-normal leading-relaxed resize-none focus:bg-white transition-all pr-16"
-                          style={{ overflow: 'hidden' }}
-                        />
-                        <div className="mt-2 sm:absolute sm:bottom-4 sm:left-4 flex items-center gap-2">
-                          {selectedImages.length < 10 && (
-                            <button
-                              onClick={() => fileInputRef.current?.click()}
-                              className={`transition-all shadow-sm border border-gray-200 flex items-center justify-center ${
-                                selectedImages.length > 0
-                                  ? 'p-2.5 rounded-2xl bg-blue-600 text-white'
-                                  : 'px-4 py-2 rounded-2xl bg-white text-gray-600 hover:text-blue-600 gap-2 text-xs font-semibold'
-                              }`}
-                            >
-                              <Icons.Camera className="w-4 h-4" />
-                              {selectedImages.length === 0 && <span>Add Visual Inspiration</span>}
-                            </button>
-                          )}
-                          {selectedImages.length > 0 && (
-                            <div className="flex gap-2">
-                              {selectedImages.map((img, idx) => (
-                                <div
-                                  key={idx}
-                                  className="relative w-11 h-11 rounded-xl overflow-hidden border border-gray-200 shadow-sm"
-                                >
-                                  <img
-                                    src={img.previewUrl}
-                                    alt="Reference"
-                                    referrerPolicy="no-referrer"
-                                    className="w-full h-full object-cover"
-                                  />
-                                  <button
-                                    onClick={() => removeImage(idx)}
-                                    className="absolute top-0 right-0 w-4 h-4 bg-black/60 text-white flex items-center justify-center"
-                                  >
-                                    <Icons.X className="w-2.5 h-2.5" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="mt-2 sm:absolute sm:bottom-4 sm:right-4">
-                          <button
-                            title="Generate a fresh band concept"
-                            onClick={handleFeelingLucky}
-                            className="px-3.5 py-2 bg-white shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 rounded-2xl text-xs font-semibold flex items-center gap-1.5 transition-transform active:scale-95"
-                          >
-                            <Icons.Sparkles className="w-4 h-4" />
-                            <span>Surprise Band Idea</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <details><summary className="cursor-pointer text-sm font-semibold">Sound settings · genre and vocals</summary>
-                {/* Step 1: Band Archetype & Custom Genre */}
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <label className="text-sm font-bold text-gray-900">
-                      Genre & instrumentation
-                    </label>
-                    <span className="text-xs text-gray-500 font-mono tabular-nums">
-                      Duration is a target. Check the finished audio.
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {BAND_ARCHETYPES.map((band) => {
-                      const active = selectedBand === band.id;
-                      return (
-                        <button
-                          key={band.id}
-                          onClick={() => handleSelectBandArchetype(band.id)}
-                          className={`text-left p-4 rounded-2xl border transition-all ${
-                            active
-                              ? 'bg-blue-50/70 border-blue-500 shadow-sm'
-                              : 'bg-gray-50/70 border-gray-200/80 hover:bg-white hover:border-gray-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="font-bold text-sm text-gray-900">
-                              {band.label}
-                            </span>
-                            <span className="text-xs font-semibold text-blue-600">
-                              {active ? 'Selected' : 'Select'}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-600 leading-relaxed">
-                            {band.tagline}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {selectedBand === 'Custom Genre' && (
-                    <div className="pt-2">
-                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                        Define Your Custom Genre & Band Instrumentation
-                      </label>
-                      <input
-                        type="text"
-                        value={customGenreName}
-                        onChange={(e) => setCustomGenreName(e.target.value)}
-                        placeholder="e.g., Upbeat Surf-Country Brass Band with Male & Female Duet"
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:bg-white"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Step 2: Vocal Arrangement & Multi-Singer Interplay */}
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <label className="text-sm font-bold text-gray-900">
-                      Vocals
-                    </label>
-                    <span className="text-xs text-gray-500">
-                      Have your own voice? Pick Singer-Free or record your live vocals over any generated band!
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {VOCAL_ARRANGEMENTS.map((vox) => (
-                      <button
-                        key={vox}
-                        onClick={() => {
-                          setVocalArrangement(vox);
-                          if (vox === 'Singer-Free (Record Your Own Voice)') {
-                            setLyricsOption('Instrumental');
-                          }
-                        }}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 border ${
-                          vocalArrangement === vox
-                            ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
-                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        {vox}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                </details>
-                {/* Step 4: Song Duration Cap (3:50 Hard Cutoff) & Lyrics Mode */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-700">
-                      2. Choose a target length
-                    </label>
-                    <div className="flex flex-wrap bg-gray-100 p-1 rounded-2xl w-fit gap-1">
-                      {(
-                        [
-                          '3:50 Radio Master (Max)',
-                          '2:48 Radio Single',
-                          '2:15 Tight Single',
-                          '0:30 Hook / Jingle',
-                        ] as Duration[]
-                      ).map((opt) => (
-                        <button
-                          key={opt}
-                          onClick={() => setDuration(opt)}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 font-mono tabular-nums ${
-                            duration === opt
-                              ? 'bg-white shadow-sm text-gray-900'
-                              : 'text-gray-600 hover:text-gray-900'
-                          }`}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-700">
-                      Lyrics & Vocal Mode
-                    </label>
-                    <div className="flex flex-wrap bg-gray-100 p-1 rounded-2xl w-fit max-w-full gap-1">
-                      {(['Auto', 'Custom', 'Instrumental'] as LyricsOption[]).map((opt) => (
-                        <button
-                          key={opt}
-                          onClick={() => setLyricsOption(opt)}
-                          className={`px-5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
-                            lyricsOption === opt
-                              ? 'bg-white shadow-sm text-gray-900'
-                              : 'text-gray-600 hover:text-gray-900'
-                          }`}
-                        >
-                          {opt === 'Instrumental' ? 'Singer-Free Instrumental' : opt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {lyricsOption === 'Custom' && (
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-700">
-                      Custom Multi-Singer Band Lyrics (Use [Male Vocal], [Female Vocal], [Full Band Chorus] cues)
-                    </label>
-                    <textarea
-                      value={customLyrics}
-                      onChange={(e) => setCustomLyrics(e.target.value)}
-                      placeholder={`[0:00] (Male Lead) Driving down the river road on a Friday night\n[0:15] (Female Lead) Stadium glow turning up the city light\n[0:30] (Full Band Harmony) Raise your voice, let the guitars ring!`}
-                      className="w-full min-h-[140px] bg-gray-50 border border-gray-200 rounded-3xl p-5 text-sm font-normal leading-relaxed resize-none focus:bg-white transition-all"
-                    />
-                  </div>
-                )}
-
-                {/* Artist Respect, AI Disclosure & Royalty Guideline Confirmation */}
-                <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <label className="flex items-start gap-3 cursor-pointer text-xs text-gray-600 leading-relaxed">
-                    <input
-                      type="checkbox"
-                      checked={ipRespectConfirmed}
-                      onChange={(e) => setIpRespectConfirmed(e.target.checked)}
-                      className="mt-0.5 rounded border-gray-300 text-blue-600"
-                    />
-                    <span>
-                      <strong className="text-gray-900">Artist Respect & Royalty-Safe Pledge:</strong>{' '}
-                      This track uses original melodies/lyrics (no copyrighted team/artist infringement) and will carry a transparent{' '}
-                      <strong className="text-gray-900">
-                        {lyricsOption === 'Instrumental' ||
-                        vocalArrangement === 'Singer-Free (Record Your Own Voice)'
-                          ? 'Human Voice + AI Backing Band'
-                          : 'AI-Generated Material'}
-                      </strong>{' '}
-                      identifier out of respect for lifelong human musicians.
-                    </span>
-                  </label>
-                </div>
-
-                <button
-                  onClick={() => handleGenerate()}
-                  disabled={
-                    (!prompt.trim() && selectedImages.length === 0) ||
-                    !ipRespectConfirmed ||
-                    CONFIG.IS_MAINTENANCE_MODE
-                  }
-                  className={`w-full py-4 rounded-2xl text-base font-bold text-white transition-all shadow-lg ${
-                    (!prompt.trim() && selectedImages.length === 0) ||
-                    !ipRespectConfirmed ||
-                    CONFIG.IS_MAINTENANCE_MODE
-                      ? 'bg-gray-300 cursor-not-allowed shadow-none'
-                      : `music-gradient shadow-pink-500/20 active:scale-[0.99] ${
-                          isTriggering ? 'scale-[0.99] brightness-110' : ''
-                        }`
-                  }`}
-                >
-                  Generate {selectedBand === 'Custom Genre' ? customGenreName : selectedBand} Track ({duration === '0:30 Hook / Jingle' || duration === '0:30 Hook Preview' ? '0:30 Jingle / Hook' : 'song target'})
-                </button>
-              </div>
-            </section>
-            <details className="mb-8"><summary className="cursor-pointer text-sm font-semibold">Need inspiration? Listen to sketches</summary>
-            <GenreSamples genre={musicPreset === 'acoustic' ? 'Indie' : musicPreset === 'singers' ? 'Pop Band' : selectedBand} owner={creatorHandle} onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setIsHelperOpen(false); }} />
-            <div className="cw cw-actions mb-6"><button onClick={() => setActiveTab('library')}>Your private library ↗</button><button onClick={() => setActiveTab('creative')}>Ask for lyrics, video, or creative help ↗</button><button onClick={() => setActiveTab('listen')}>Explore all genres ↗</button></div>
-            </details>
-          </>
-        )}
+        {activeTab === 'bands' && <>
+          <MusicStudio
+            genre={selectedBand} onGenre={handleSelectBandArchetype}
+            vocals={vocalArrangement} onVocals={setVocalArrangement}
+            brief={prompt} onBrief={value => { setPrompt(value); setIsPromptManual(true); }}
+            duration={duration} onDuration={setDuration}
+            lyricsMode={lyricsOption} onLyricsMode={setLyricsOption}
+            lyrics={customLyrics} onLyrics={setCustomLyrics}
+            customGenre={customGenreName} onCustomGenre={setCustomGenreName}
+            images={selectedImages} onImages={handleImageUpload} onRemoveImage={removeImage}
+            generate={() => handleGenerate()} generating={gen.results.some(r => r.status === 'generating')}
+            disabled={(!prompt.trim() && selectedImages.length === 0) || !ipRespectConfirmed || CONFIG.IS_MAINTENANCE_MODE}
+            confirmed={ipRespectConfirmed} onConfirmed={setIpRespectConfirmed}
+            featured={gen.results.find(r => r.status === 'completed' && r.audioUrl && r.itemType !== 'podcast' && r.itemType !== 'commercial')}
+            helperOpen={isHelperOpen} onHelperOpen={setIsHelperOpen}
+            helper={<PromptBuilder isHelperOpen={isHelperOpen} helperSections={helperSections} setHelperSections={setHelperSections} activeSelector={activeSelector} setActiveSelector={setActiveSelector} selectedImages={selectedImages} onImageSelect={() => fileInputRef.current?.click()} onImageRemove={removeImage} />}
+          />
+          <input className="hidden" ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} />
+          <details className="studio-inspiration"><summary>Explore more sounds & original sketches</summary>
+            <GenreSamples genre={selectedBand} owner={creatorHandle} onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setIsHelperOpen(false); }} />
+            <div className="cw cw-actions"><button onClick={() => setActiveTab('creative')}>Develop lyrics or a new direction</button><button onClick={() => setActiveTab('holidays')}>Seasonal templates</button></div>
+          </details>
+        </>}
 
         {/* ===================================================================== */}
         {/* TAB 2: RADIO STATIONS & SYNDICATION LAUNCHPAD                         */}
@@ -2318,7 +1895,7 @@ const App: React.FC = () => {
           <div className="relative mb-8 flex items-center justify-between border-b border-gray-200/80 pb-4">
             <div>
               <h2 className="text-xl font-extrabold text-gray-900">
-                Studio Creations & Kindness Community Feed
+                Your studio sessions
               </h2>
               <p className="text-xs text-gray-500">
                 Review your audio and lyrics here, then save to My Library or export. Duration labels are targets. Feedback and upload checklists are local session previews.

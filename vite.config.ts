@@ -7,7 +7,7 @@ export default defineConfig(() => {
       server: {
         port: 3000,
         host: '0.0.0.0',
-        allowedHosts: ['.e2b.app'],
+        allowedHosts: ['.e2b.app', 'terminal.local'],
       },
       plugins: [react()],
       resolve: {

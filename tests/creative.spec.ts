@@ -99,7 +99,7 @@ test("samples play, library persists, and public permission is independent of re
   await page.getByLabel("Public listening (local preview)").uncheck();
   await expect(page.getByLabel("Separately allow remixes")).not.toBeChecked();
   await page.getByLabel("Public listening (local preview)").check();
-  await page.getByRole("button", { name: "Told Them · Listen" }).click();
+  await page.getByRole("button", { name: "Listen" }).click();
   await expect(page.locator(".cw-track")).toHaveCount(1);
   expect(errors).toEqual([]);
 });
