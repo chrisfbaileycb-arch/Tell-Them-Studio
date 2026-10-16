@@ -1,6 +1,7 @@
 // Original procedural compositions, not recordings or artist imitations.
 export const GENRES = [
   "Rock Band",
+  "Hair Metal Band",
   "Country Band",
   "Pop Band",
   "Disco Band",
@@ -18,6 +19,7 @@ export const GENRES = [
 export type SampleGenre = (typeof GENRES)[number];
 export const SAMPLE_TITLES: Record<SampleGenre, [string, string]> = {
   "Rock Band": ["Open-road sparks", "After the lights"],
+  "Hair Metal Band": ["Sunset Strip spotlight", "Velvet amplifier"],
   "Country Band": ["Porchlight promise", "Sunday on the river"],
   "Pop Band": ["A little brighter", "Skyline hearts"],
   "Disco Band": ["Golden-hour groove", "Mirrorball morning"],
@@ -78,6 +80,7 @@ export function makeGenreSample(genre: SampleGenre, variation: number): Blob {
         "Anime-Inspired": 152,
         Electronic: 126,
         "Rock Band": 128,
+        "Hair Metal Band": 136,
         "Disco Band": 118,
       } as Record<string, number>
     )[genre] || 112;

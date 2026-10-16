@@ -4,6 +4,7 @@ import './src/components/studio.css';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   BandArchetype,
+  CommunityFeedItem,
   ContentOriginType,
   DistributionPlatformName,
   Duration,
@@ -47,6 +48,13 @@ import {
 import { getRandomItem } from './src/utils/helpers';
 import { PromptBuilder, HelperSection } from './src/components/PromptBuilder';
 import { CreativeWorkspace, GenreSamples, PodcastSamples, SaveCreations } from './src/components/CreativeWorkspace';
+import { PublicCommunityShowcase, PersistentCommunityPlayer } from './src/components/PublicCommunityShowcase';
+import {
+  createCommunityFeedItemFromResult,
+  hydrateCommunityFeedAudio,
+  loadCommunityFeedSync,
+  saveCommunityFeedSync,
+} from './src/utils/communityFeed';
 import { TrendingView } from './src/components/TrendingView';
 import { useDraft } from './src/hooks/useDraft';
 import { Hero } from './src/components/Hero';
@@ -198,6 +206,76 @@ const App: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Public Community Showcase Feed (Persisted in localStorage + IndexedDB)
+  const [communityFeed, setCommunityFeed] = useState<CommunityFeedItem[]>(() =>
+    loadCommunityFeedSync()
+  );
+  const [communityNotice, setCommunityNotice] = useState<string | null>(null);
+
+  // Persistent Community Player Widget State
+  const [persistentTrack, setPersistentTrack] = useState<CommunityFeedItem | null>(null);
+  const [persistentPlaying, setPersistentPlaying] = useState(false);
+  const [persistentTime, setPersistentTime] = useState(0);
+  const [persistentDuration, setPersistentDuration] = useState(0);
+  const persistentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    hydrateCommunityFeedAudio(communityFeed).then((hydrated) => {
+      setCommunityFeed(hydrated);
+    });
+  }, []);
+
+  const handlePublishToCommunity = async (result: SongResult) => {
+    if (result.itemType === 'commercial') return;
+    const narratorLabel =
+      result.itemType === 'podcast'
+        ? `Narrators: ${podcastHostA} (${podcastHostAVoice}) & ${podcastHostB} (${podcastHostBVoice})`
+        : undefined;
+    const feedItem = await createCommunityFeedItemFromResult(result, narratorLabel);
+    setCommunityFeed((prev) => {
+      const updated = [feedItem, ...prev.filter((item) => item.id !== feedItem.id)];
+      saveCommunityFeedSync(updated);
+      return updated;
+    });
+    setCommunityNotice(`Published "${feedItem.title}" to the Public Community Showcase!`);
+  };
+
+  const handlePlayCommunityTrack = (track: CommunityFeedItem) => {
+    if (persistentTrack?.id === track.id) {
+      const el = persistentAudioRef.current;
+      if (el) {
+        if (el.paused) {
+          el.play().catch(() => {});
+        } else {
+          el.pause();
+        }
+      }
+      return;
+    }
+    setPersistentTrack(track);
+    setPersistentTime(0);
+    setPersistentDuration(0);
+    setTimeout(() => {
+      persistentAudioRef.current?.play().catch(() => {});
+    }, 30);
+  };
+
+  const handleSeekCommunityTrack = (track: CommunityFeedItem, timeSec: number) => {
+    if (persistentTrack?.id !== track.id) {
+      setPersistentTrack(track);
+      setPersistentTime(timeSec);
+      setTimeout(() => {
+        if (persistentAudioRef.current) {
+          persistentAudioRef.current.currentTime = timeSec;
+          persistentAudioRef.current.play().catch(() => {});
+        }
+      }, 30);
+    } else if (persistentAudioRef.current) {
+      persistentAudioRef.current.currentTime = timeSec;
+      setPersistentTime(timeSec);
+    }
+  };
 
   // Initialize playable preview WAVs on seeded community songs so they work immediately
   useEffect(() => {
@@ -1025,6 +1103,42 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {communityNotice && (
+          <div role="status" className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-4 text-sm text-emerald-950">
+            <span>{communityNotice}</span>
+            <div className="flex items-center gap-2 shrink-0">
+              {activeTab !== 'listen' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('listen')}
+                  className="px-3 py-1 text-xs font-bold bg-gray-900 text-white rounded-lg"
+                >
+                  Open Listen Showcase ↗
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setCommunityNotice(null)}
+                className="px-3 py-1 text-xs font-semibold bg-white border border-emerald-200 rounded-lg"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'listen' && (
+          <PublicCommunityShowcase
+            feed={communityFeed}
+            activeTrack={persistentTrack}
+            isPlaying={persistentPlaying}
+            currentTime={persistentTime}
+            duration={persistentDuration}
+            onPlayTrack={handlePlayCommunityTrack}
+            onSeekTrack={handleSeekCommunityTrack}
+          />
+        )}
+
         {(['listen', 'library', 'creative'] as string[]).includes(activeTab) && (
           <CreativeWorkspace mode={activeTab as 'listen' | 'library' | 'creative'} owner={creatorHandle}
             onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setIsHelperOpen(false); setActiveTab('bands'); }}
@@ -1037,29 +1151,35 @@ const App: React.FC = () => {
         {/* ===================================================================== */}
         {/* TAB 1: BAND STUDIO, SINGER STUDIO & ACOUSTIC STUDIO                   */}
         {/* ===================================================================== */}
-        {activeTab === 'bands' && <>
-          <MusicStudio
-            genre={selectedBand} onGenre={handleSelectBandArchetype}
-            vocals={vocalArrangement} onVocals={setVocalArrangement}
-            brief={prompt} onBrief={value => { setPrompt(value); setIsPromptManual(true); }}
-            duration={duration} onDuration={setDuration}
-            lyricsMode={lyricsOption} onLyricsMode={setLyricsOption}
-            lyrics={customLyrics} onLyrics={setCustomLyrics}
-            customGenre={customGenreName} onCustomGenre={setCustomGenreName}
-            images={selectedImages} onImages={handleImageUpload} onRemoveImage={removeImage}
-            generate={() => handleGenerate()} generating={gen.results.some(r => r.status === 'generating')}
-            disabled={(!prompt.trim() && selectedImages.length === 0) || !ipRespectConfirmed || CONFIG.IS_MAINTENANCE_MODE}
-            confirmed={ipRespectConfirmed} onConfirmed={setIpRespectConfirmed}
-            featured={gen.results.find(r => r.status === 'completed' && r.audioUrl && r.itemType !== 'podcast' && r.itemType !== 'commercial')}
-            helperOpen={isHelperOpen} onHelperOpen={setIsHelperOpen}
-            helper={<PromptBuilder isHelperOpen={isHelperOpen} helperSections={helperSections} setHelperSections={setHelperSections} activeSelector={activeSelector} setActiveSelector={setActiveSelector} selectedImages={selectedImages} onImageSelect={() => fileInputRef.current?.click()} onImageRemove={removeImage} />}
-          />
+        {activeTab === 'bands' && (() => {
+          const featuredTrack = gen.results.find(r => r.status === 'completed' && r.audioUrl && r.itemType !== 'podcast' && r.itemType !== 'commercial');
+          return <>
+            <MusicStudio
+              genre={selectedBand} onGenre={handleSelectBandArchetype}
+              vocals={vocalArrangement} onVocals={setVocalArrangement}
+              brief={prompt} onBrief={value => { setPrompt(value); setIsPromptManual(true); }}
+              duration={duration} onDuration={setDuration}
+              lyricsMode={lyricsOption} onLyricsMode={setLyricsOption}
+              lyrics={customLyrics} onLyrics={setCustomLyrics}
+              customGenre={customGenreName} onCustomGenre={setCustomGenreName}
+              images={selectedImages} onImages={handleImageUpload} onRemoveImage={removeImage}
+              generate={() => handleGenerate()} generating={gen.results.some(r => r.status === 'generating')}
+              disabled={(!prompt.trim() && selectedImages.length === 0) || !ipRespectConfirmed || CONFIG.IS_MAINTENANCE_MODE}
+              confirmed={ipRespectConfirmed} onConfirmed={setIpRespectConfirmed}
+              featured={featuredTrack}
+              onDownloadFeatured={handleDownload}
+              onPublishFeatured={handlePublishToCommunity}
+              isFeaturedPublished={!!featuredTrack && communityFeed.some(item => item.id === featuredTrack.id && !featuredTrack.id.startsWith('seed-'))}
+              helperOpen={isHelperOpen} onHelperOpen={setIsHelperOpen}
+              helper={<PromptBuilder isHelperOpen={isHelperOpen} helperSections={helperSections} setHelperSections={setHelperSections} activeSelector={activeSelector} setActiveSelector={setActiveSelector} selectedImages={selectedImages} onImageSelect={() => fileInputRef.current?.click()} onImageRemove={removeImage} />}
+            />
           <input className="hidden" ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} />
           <details className="studio-inspiration"><summary>Explore more sounds & original sketches</summary>
             <GenreSamples genre={selectedBand} owner={creatorHandle} onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setIsHelperOpen(false); }} />
             <div className="cw cw-actions"><button onClick={() => setActiveTab('creative')}>Develop lyrics or a new direction</button><button onClick={() => setActiveTab('holidays')}>Seasonal templates</button></div>
           </details>
-        </>}
+        </>;
+        })()}
 
         {/* ===================================================================== */}
         {/* TAB 2: RADIO STATIONS & SYNDICATION LAUNCHPAD                         */}
@@ -2116,6 +2236,23 @@ const App: React.FC = () => {
                               <span>Download Master WAV</span>
                             </button>
 
+                            {result.itemType !== 'commercial' && (
+                              <button
+                                type="button"
+                                onClick={() => handlePublishToCommunity(result)}
+                                className="px-4 py-2.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold flex items-center gap-2 whitespace-nowrap shrink-0 border border-purple-500/60"
+                              >
+                                <Icons.Share className="w-4 h-4 text-purple-300" />
+                                <span>
+                                  {communityFeed.some(
+                                    (item) => item.id === result.id && !result.id.startsWith('seed-')
+                                  )
+                                    ? 'Published to Community ✓'
+                                    : 'Publish to Community'}
+                                </span>
+                              </button>
+                            )}
+
                             <button
                               onClick={() => onDownloadVideo(result, false)}
                               disabled={isEncoding}
@@ -2569,6 +2706,34 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      <PersistentCommunityPlayer
+        track={persistentTrack}
+        audioRef={persistentAudioRef}
+        isPlaying={persistentPlaying}
+        currentTime={persistentTime}
+        duration={persistentDuration}
+        onTogglePlay={() => {
+          const el = persistentAudioRef.current;
+          if (!el) return;
+          if (el.paused) el.play().catch(() => {});
+          else el.pause();
+        }}
+        onSeek={(timeSec) => {
+          if (persistentAudioRef.current) {
+            persistentAudioRef.current.currentTime = timeSec;
+          }
+          setPersistentTime(timeSec);
+        }}
+        onClose={() => {
+          persistentAudioRef.current?.pause();
+          setPersistentPlaying(false);
+          setPersistentTrack(null);
+        }}
+        onTimeUpdate={setPersistentTime}
+        onDurationChange={setPersistentDuration}
+        onPlayStateChange={setPersistentPlaying}
+      />
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }

@@ -92,6 +92,13 @@ export const BAND_ARCHETYPES: {
     instruments: 'Twin electric guitars, tube bass amp, live drum kit, multi-singer stadium harmonies',
   },
   {
+    id: 'Hair Metal Band',
+    label: 'Hair Metal Band',
+    tagline: 'Soaring 80s twin-guitar shred, glam arena hooks, high-register vocals & gang chorus',
+    defaultVocals: 'Dual Male Lead & Harmony',
+    instruments: 'Shredded twin electric guitars, gated-reverb arena drums, punchy bass, big gang harmonies',
+  },
+  {
     id: 'Country Band',
     label: 'Country Band',
     tagline: 'Male & female duet vocals, acoustic flattop, pedal steel, fiddle, warm upright groove',
@@ -161,6 +168,7 @@ export const PROMPT_HELPER_CONFIG = {
   ],
   genders: [
     'Rock Band (Multi-Singer)',
+    'Hair Metal Band (80s Arena Shred)',
     'Country Band (Duet Harmonies)',
     'Pop Group (Trade-Off Vocals)',
     'Disco Band (Full Horn & Vocal Ensemble)',

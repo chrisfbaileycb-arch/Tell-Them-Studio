@@ -28,6 +28,7 @@ export type StudioTab =
 
 export type BandArchetype =
   | 'Rock Band'
+  | 'Hair Metal Band'
   | 'Country Band'
   | 'Pop Band'
   | 'Disco Band'
@@ -194,3 +195,19 @@ export interface HolidayTemplate {
 export interface GenerationState {
   results: SongResult[];
 }
+
+export interface CommunityFeedItem {
+  id: string;
+  title: string;
+  creatorHandle: string;
+  genre: string;
+  audioUrl: string;
+  lyrics: string;
+  type: 'music' | 'podcast';
+  createdAt: string;
+  narratorInfo?: string;
+  durationLabel?: string;
+  coverImageUrl?: string;
+  vocalArrangement?: string;
+}
+
