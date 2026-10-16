@@ -45,12 +45,12 @@ import { TrendingView } from './src/components/TrendingView';
 
 const App: React.FC = () => {
   // Active workspace tab
-  const [activeTab, setActiveTab] = useState<StudioTab>(() => { const route = window.location.hash.slice(1); return ['bands', 'stations', 'podcasts', 'commercials', 'holidays', 'trending', 'listen', 'library', 'creative'].includes(route) ? route as StudioTab : 'bands'; });
+  const [activeTab, setActiveTab] = useState<StudioTab>(() => { const route = window.location.hash.slice(1); return ['bands', 'singers', 'acoustic', 'stations', 'podcasts', 'commercials', 'holidays', 'trending', 'listen', 'library', 'creative'].includes(route) ? route as StudioTab : 'bands'; });
 
   useEffect(() => {
     const onRoute = () => {
       const route = window.location.hash.slice(1);
-      if (['bands', 'stations', 'podcasts', 'commercials', 'holidays', 'trending', 'listen', 'library', 'creative'].includes(route)) setActiveTab(route as StudioTab);
+      if (['bands', 'singers', 'acoustic', 'stations', 'podcasts', 'commercials', 'holidays', 'trending', 'listen', 'library', 'creative'].includes(route)) setActiveTab(route as StudioTab);
     };
     window.addEventListener('hashchange', onRoute);
     return () => window.removeEventListener('hashchange', onRoute);
@@ -73,7 +73,7 @@ const App: React.FC = () => {
     'Create an upbeat, radio-ready Rock Band song with male and female singers trading verses and harmonizing on an anthemic hometown pride chorus.'
   );
   const [isPromptManual, setIsPromptManual] = useState(false);
-  const [duration, setDuration] = useState<Duration>('2:48 Radio Master (Max)');
+  const [duration, setDuration] = useState<Duration>('3:50 Radio Master (Max)');
   const [lyricsOption, setLyricsOption] = useState<LyricsOption>('Auto');
   const [customLyrics, setCustomLyrics] = useState('');
   const [selectedImages, setSelectedImages] = useState<
@@ -112,7 +112,7 @@ const App: React.FC = () => {
   // Mini-Podcast Studio States (5 to 10 mins max, mandatory weekly schedule)
   const [podcastShowTitle, setPodcastShowTitle] = useState('Backstage Band & Radio Weekly');
   const [podcastTopic, setPodcastTopic] = useState(
-    'How multi-singer rock and disco bands craft unforgettable 2:48 radio hooks without filler'
+    'How multi-singer rock and disco bands craft unforgettable radio hooks within the 3:50 song cutoff'
   );
   const [podcastTargetMinutes, setPodcastTargetMinutes] = useState<number>(7);
   const [podcastDay, setPodcastDay] = useState('Every Wednesday');
@@ -204,7 +204,7 @@ const App: React.FC = () => {
           const scaleInfo = s.scale ? ` in the scale of ${s.scale}` : '';
           if (s.type === 'main') {
             const bpmInfo = s.bpm ? ` at ${s.bpm}` : '';
-            return `Create a ${s.mood?.toLowerCase()} ${s.gender} song about ${s.theme?.toLowerCase()} featuring ${vocalArrangement}${bpmInfo}${scaleInfo}. Max duration 2:48.`;
+            return `Create a ${s.mood?.toLowerCase()} ${s.gender} song about ${s.theme?.toLowerCase()} featuring ${vocalArrangement}${bpmInfo}${scaleInfo}. Hard cutoff 3:50.`;
           } else {
             return `[From ${s.timestamp}] the arrangement transitions to a ${s.mood?.toLowerCase()} ${s.gender} section${scaleInfo}.`;
           }
@@ -264,7 +264,7 @@ const App: React.FC = () => {
     const genreLabel =
       selectedBand === 'Custom Genre' ? customGenreName : selectedBand;
     setPrompt(
-      `Create a ${randomMood.toLowerCase()} ${genreLabel} song about ${randomTheme.toLowerCase()} featuring ${vocalArrangement} and live band instrumentation. Radio edit capped at 2:48.`
+      `Create a ${randomMood.toLowerCase()} ${genreLabel} song about ${randomTheme.toLowerCase()} featuring ${vocalArrangement} and live band instrumentation. Full song capped at 3:50.`
     );
     setIsPromptManual(false);
   };
@@ -290,7 +290,7 @@ const App: React.FC = () => {
     }));
   };
 
-  // Generate Band Song (Capped at 2:48 max)
+  // Generate Band / Singer / Acoustic Song (Hard cutoff at 3:50 max for songs; jingles separate)
   const handleGenerate = async (overrides?: {
     prompt: string;
     duration: Duration;
@@ -324,6 +324,20 @@ const App: React.FC = () => {
       activeVocals === 'Singer-Free (Record Your Own Voice)' ||
       activeLyricsOption === 'Instrumental';
 
+    const isClip =
+      activeDuration === '0:30 Hook / Jingle' ||
+      activeDuration === '0:30 Hook Preview' ||
+      activeDuration === 'Lyria 3 Clip (30s)' ||
+      activeDuration === 'Clip (30s)';
+
+    const targetLengthDescription = isClip
+      ? '30-second jingle or hook preview'
+      : activeDuration === '2:15 Tight Single'
+      ? 'tight 2-minute 15-second radio single (within the 3:50 song cutoff)'
+      : activeDuration === '2:48 Radio Single' || activeDuration === '2:48 Radio Master (Max)'
+      ? '2-minute 48-second radio single (within the 3:50 song cutoff)'
+      : 'full-length radio song up to the 3 minutes and 50 seconds (3:50) hard cutoff';
+
     const newResult: SongResult = {
       id: newId,
       itemType: 'song',
@@ -340,16 +354,17 @@ const App: React.FC = () => {
         ? 'Human Voice + AI Backing Band'
         : 'AI-Generated Material',
       lyrics: '',
-      metadata: `${activeBand === 'Custom Genre' ? customGenreName : activeBand} · ${activeVocals} · 2:48 Max Cap`,
+      metadata: `${activeBand === 'Custom Genre' ? customGenreName : activeBand} · ${activeVocals} · ${isClip ? '0:30 Jingle/Hook' : '3:50 Max Song Cutoff'}`,
       fullPrompt: null,
       error: null,
       duration: activeDuration,
-      maxCapLabel:
-        activeDuration === '0:30 Hook Preview' || activeDuration === 'Lyria 3 Clip (30s)'
-          ? '0:30 / 2:48 MAX'
-          : activeDuration === '2:15 Tight Single'
-          ? '2:15 / 2:48 MAX'
-          : '2:48 / 2:48 MAX',
+      maxCapLabel: isClip
+        ? '0:30 JINGLE / HOOK'
+        : activeDuration === '2:15 Tight Single'
+        ? '2:15 / 3:50 MAX'
+        : activeDuration === '2:48 Radio Single' || activeDuration === '2:48 Radio Master (Max)'
+        ? '2:48 / 3:50 MAX'
+        : '3:50 / 3:50 MAX',
       timestamp: new Date(),
       isExpanded: true,
       thumbsUp: 1,
@@ -364,17 +379,12 @@ const App: React.FC = () => {
       results: [newResult, ...prev.results.map((r) => ({ ...r, isExpanded: false }))],
     }));
 
-    const isClip =
-      activeDuration === '0:30 Hook Preview' ||
-      activeDuration === 'Lyria 3 Clip (30s)' ||
-      activeDuration === 'Clip (30s)';
-
     const genreDescription =
       activeBand === 'Custom Genre' ? customGenreName : activeBand;
 
     addLog(
       newId,
-      `Initializing ${genreDescription} (${activeVocals}) — enforcing 2:48 max radio cap...`
+      `Initializing ${genreDescription} (${activeVocals}) — ${isClip ? '0:30 Jingle/Hook mode' : 'enforcing 3:50 hard cutoff for songs'}...`
     );
     addLog(
       newId,
@@ -386,11 +396,9 @@ const App: React.FC = () => {
         ? 'IMPORTANT: This track MUST be strictly INSTRUMENTAL with clear vocal pocket headroom so a human singer can record or perform over the band.'
         : activeLyricsOption === 'Custom'
         ? `\nUse these exact lyrics with ${activeVocals}:\n${activeCustomLyrics}`
-        : `\nGenerate uplifting, radio-safe lyrics arranged for ${activeVocals} with clear vocal handoffs (e.g. [Lead 1], [Lead 2], [Band Chorus]).`;
+        : `\nGenerate uplifting, radio-safe lyrics arranged for ${activeVocals} with clear vocal handoffs (e.g. [Lead 1], [Lead 2], [Band Chorus], [Bridge]).`;
 
-      const promptText = `Generate a ${
-        isClip ? '30-second hook preview' : 'tight radio-ready track (strictly max 2 minutes 48 seconds)'
-      } performed by a ${genreDescription}. Vocal arrangement: ${activeVocals}. Context: "${activePrompt}". ${lyricInstruction} Keep all content family-safe, original, and respectful.`;
+      const promptText = `Generate a ${targetLengthDescription} performed by a ${genreDescription}. Vocal arrangement: ${activeVocals}. Context: "${activePrompt}". ${lyricInstruction} Keep all content family-safe, original, and respectful.`;
 
       updateResult(newId, (r) => ({ ...r, fullPrompt: promptText }));
 
@@ -410,7 +418,7 @@ const App: React.FC = () => {
         lyrics: lyrics || (isSingerFree ? 'Instrumental Band Backing Track (Ready for Your Voice)' : ''),
         metadata: metadata || r.metadata,
       }));
-      addLog(newId, 'Master audio stream captured and verified under 2:48 cap.');
+      addLog(newId, isClip ? 'Jingle / hook stream captured.' : 'Master audio stream captured and verified under 3:50 hard song cutoff.');
 
       const title = await generateSongTitle(activePrompt, lyrics || activePrompt);
       updateResult(newId, (r) => ({ ...r, title }));
@@ -467,7 +475,7 @@ const App: React.FC = () => {
       metadata: `Mini-Podcast · ${podcastTargetMinutes}:00 Target (10m Max) · ${podcastDay}`,
       fullPrompt: `Show: ${podcastShowTitle} | Topic: ${podcastTopic} | Hosts: ${podcastHostA} & ${podcastHostB}`,
       error: null,
-      duration: '2:48 Radio Master (Max)',
+      duration: '3:50 Radio Master (Max)',
       maxCapLabel: `${podcastTargetMinutes}:00 / 10:00 MAX`,
       timestamp: new Date(),
       isExpanded: true,
@@ -481,7 +489,7 @@ const App: React.FC = () => {
         committedWeekly: true,
       },
       originalPrompt: podcastTopic,
-      originalDuration: '2:48 Radio Master (Max)',
+      originalDuration: '3:50 Radio Master (Max)',
       originalLyricsOption: 'Auto',
     };
 
@@ -736,7 +744,7 @@ const App: React.FC = () => {
       creatorHandle,
       tagline:
         newStationTagline.trim() ||
-        'Custom creator radio station featuring 2:48 band hits, weekly mini-podcasts, and craft spots.',
+        'Custom creator radio station featuring up to 3:50 band hits, weekly mini-podcasts, and craft spots.',
       genreFocus: newStationGenre,
       coverSvgUrl: createStudioCoverSvg('#1e1b4b', '#0f172a', '#38bdf8', 'radio'),
       listenersCount: 1,
@@ -759,7 +767,7 @@ const App: React.FC = () => {
     setPrompt(tpl.prompt);
     setCustomLyrics(tpl.suggestedLyrics);
     setLyricsOption('Custom');
-    setDuration('2:48 Radio Master (Max)');
+    setDuration('3:50 Radio Master (Max)');
     setIsHelperOpen(false);
     setActiveTab('bands');
   };
@@ -850,6 +858,34 @@ const App: React.FC = () => {
             Band Studio
           </button>
           <button
+            onClick={() => {
+              setSelectedBand('Pop Band');
+              setVocalArrangement('Multi-Singer Trade-Off (Male & Female)');
+              setActiveTab('singers');
+            }}
+            className={`hover:text-gray-900 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
+              activeTab === 'singers'
+                ? 'border-pink-600 text-gray-900 font-semibold'
+                : 'border-transparent'
+            }`}
+          >
+            Singer Studio
+          </button>
+          <button
+            onClick={() => {
+              setSelectedBand('Indie');
+              setVocalArrangement('Dual Female Lead & Harmony');
+              setActiveTab('acoustic');
+            }}
+            className={`hover:text-gray-900 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
+              activeTab === 'acoustic'
+                ? 'border-pink-600 text-gray-900 font-semibold'
+                : 'border-transparent'
+            }`}
+          >
+            Acoustic Studio
+          </button>
+          <button
             onClick={() => setActiveTab('stations')}
             className={`hover:text-gray-900 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
               activeTab === 'stations'
@@ -858,26 +894,6 @@ const App: React.FC = () => {
             }`}
           >
             Radio Stations
-          </button>
-          <button
-            onClick={() => setActiveTab('podcasts')}
-            className={`hover:text-gray-900 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
-              activeTab === 'podcasts'
-                ? 'border-pink-600 text-gray-900 font-semibold'
-                : 'border-transparent'
-            }`}
-          >
-            Mini-Podcasts
-          </button>
-          <button
-            onClick={() => setActiveTab('holidays')}
-            className={`hover:text-gray-900 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
-              activeTab === 'holidays'
-                ? 'border-pink-600 text-gray-900 font-semibold'
-                : 'border-transparent'
-            }`}
-          >
-            Holiday Hub
           </button>
           <button
             onClick={() => setActiveTab('trending')}
@@ -943,7 +959,7 @@ const App: React.FC = () => {
             <span aria-hidden="true">·</span>
             <span>Handle-Only Safe Community</span>
             <span aria-hidden="true">·</span>
-            <span className="font-mono tabular-nums">Songs Max 2:48</span>
+            <span className="font-mono tabular-nums">Songs Max 3:50 (Jingles Separate)</span>
             <span aria-hidden="true">·</span>
             <span className="font-mono tabular-nums">Weekly Podcasts 5–10m</span>
             <span aria-hidden="true">·</span>
@@ -956,12 +972,13 @@ const App: React.FC = () => {
               [
                 { id: 'listen', label: 'Told Them · Listen' },
                 { id: 'bands', label: 'Band Studio' },
+                { id: 'singers', label: 'Singer Studio' },
+                { id: 'acoustic', label: 'Acoustic Studio' },
                 { id: 'creative', label: 'AI · Lyrics, Video & Mix' },
                 { id: 'library', label: 'My Library' },
                 { id: 'stations', label: 'Radio Stations' },
                 { id: 'podcasts', label: 'Mini-Podcasts (5–10m)' },
                 { id: 'commercials', label: 'Commercial Craft' },
-                { id: 'holidays', label: 'Holiday Specials' },
                 { id: 'trending', label: 'Trending' },
               ] as { id: StudioTab; label: string }[]
             ).map((t) => (
@@ -1006,23 +1023,134 @@ const App: React.FC = () => {
         {activeTab === 'commercials' && <GenreSamples genre="Pop Band" owner={creatorHandle} onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setActiveTab('bands'); }} />}
 
         {/* ===================================================================== */}
-        {/* TAB 1: MULTI-SINGER BAND & CUSTOM GENRE STUDIO                        */}
+        {/* TAB 1: BAND STUDIO, SINGER STUDIO & ACOUSTIC STUDIO                   */}
         {/* ===================================================================== */}
-        {activeTab === 'bands' && (
+        {(activeTab === 'bands' || activeTab === 'singers' || activeTab === 'acoustic') && (
           <>
             <section className="text-center mb-10 space-y-3">
               <h1
                 className="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight"
                 style={{ textWrap: 'balance' }}
               >
-                Build Your Band, Vocal Lineup & Radio Single
+                {activeTab === 'singers'
+                  ? 'Singer Studio: Lead Vocals, Duets & Live Voice'
+                  : activeTab === 'acoustic'
+                  ? 'Acoustic Studio: Unplugged Guitar, Piano & Voice'
+                  : 'Build Your Band, Vocal Lineup & Radio Single'}
               </h1>
               <p className="text-base md:text-lg text-gray-500 max-w-3xl mx-auto font-normal leading-relaxed">
-                Explore Rock, Country, Rap, Hip-Hop, Indie, Jazz, anime-inspired music, and Serenity—or create singer-free backing tracks for your own voice. Every track is radio-paced at a maximum of 2 minutes and 48 seconds and ready to publish to Spotify, YouTube, and Amazon Music.
+                {activeTab === 'singers'
+                  ? 'Craft vocal-forward solos, male and female duets, 3-part harmonies, or record your own live voice over studio backing tracks—every song can run up to the 3 minutes and 50 seconds (3:50) hard cutoff.'
+                  : activeTab === 'acoustic'
+                  ? 'Create warm fingerstyle acoustic guitar sessions, upright piano ballads, folk harmonies, and intimate coffeehouse tracks up to the 3 minutes and 50 seconds (3:50) hard cutoff.'
+                  : 'Explore Rock, Country, Rap, Hip-Hop, Indie, Jazz, anime-inspired music, and Serenity—or create singer-free backing tracks for your own voice. Every song can run up to a hard cutoff of 3 minutes and 50 seconds (3:50) (with separate shorter formats for jingles and commercials) and is ready to publish to Spotify, YouTube, and Amazon Music.'}
               </p>
+
+              {activeTab === 'singers' && (
+                <div className="pt-2 flex flex-wrap justify-center gap-2">
+                  {[
+                    {
+                      label: 'Male & Female Duet Spotlight',
+                      band: 'Pop Band' as BandArchetype,
+                      vox: 'Multi-Singer Trade-Off (Male & Female)' as VocalArrangement,
+                      brief:
+                        'Create a vocal-forward Pop & Soul duet where male and female singers trade expressive verses and blend in a soaring chorus. Up to 3:50.',
+                    },
+                    {
+                      label: 'Powerhouse Female Lead',
+                      band: 'Pop Band' as BandArchetype,
+                      vox: 'Lead Female + Band Backing' as VocalArrangement,
+                      brief:
+                        'Create an uplifting song showcasing a powerhouse female lead vocalist with rich backing harmonies and dynamic studio arrangement. Up to 3:50.',
+                    },
+                    {
+                      label: 'Warm Male Storyteller Lead',
+                      band: 'Country Band' as BandArchetype,
+                      vox: 'Lead Male + Band Backing' as VocalArrangement,
+                      brief:
+                        'Create a heartfelt Country & Americana track featuring a warm male lead singer and tight chorus harmony. Up to 3:50.',
+                    },
+                    {
+                      label: '3-Part Vocal Harmony Group',
+                      band: 'Disco Band' as BandArchetype,
+                      vox: '3-Part Band Harmonies' as VocalArrangement,
+                      brief:
+                        'Create an energetic 3-part vocal harmony track with tight call-and-response hooks and vibrant rhythm section. Up to 3:50.',
+                    },
+                    {
+                      label: 'Backing Track for My Own Voice',
+                      band: 'Singer-Free Instrumental' as BandArchetype,
+                      vox: 'Singer-Free (Record Your Own Voice)' as VocalArrangement,
+                      brief:
+                        'Create a studio backing arrangement with clear vocal pocket headroom designed for a human singer to record live vocals over. Up to 3:50.',
+                    },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      onClick={() => {
+                        handleSelectBandArchetype(preset.band);
+                        setVocalArrangement(preset.vox);
+                        setPrompt(preset.brief);
+                        setIsHelperOpen(false);
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-white border border-gray-200 hover:border-blue-500 text-xs font-semibold text-gray-800 shadow-sm transition-colors"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {activeTab === 'acoustic' && (
+                <div className="pt-2 flex flex-wrap justify-center gap-2">
+                  {[
+                    {
+                      label: 'Fingerstyle Acoustic Guitar & Duet',
+                      band: 'Indie' as BandArchetype,
+                      vox: 'Multi-Singer Trade-Off (Male & Female)' as VocalArrangement,
+                      brief:
+                        'Create an intimate unplugged acoustic session featuring warm fingerstyle flattop guitar, upright bass, and male & female duet harmonies. Up to 3:50.',
+                    },
+                    {
+                      label: 'Grand Piano & Intimate Vocal',
+                      band: 'Serenity' as BandArchetype,
+                      vox: 'Lead Female + Band Backing' as VocalArrangement,
+                      brief:
+                        'Create a stripped-back acoustic grand piano and warm cello arrangement with an expressive, close-mic lead vocal. Up to 3:50.',
+                    },
+                    {
+                      label: 'Front Porch Country Acoustic',
+                      band: 'Country Band' as BandArchetype,
+                      vox: 'Dual Male Lead & Harmony' as VocalArrangement,
+                      brief:
+                        'Create a warm acoustic flattop guitar, mandolin, and upright bass porch session with close vocal harmonies. Up to 3:50.',
+                    },
+                    {
+                      label: 'Unplugged Instrumental Guitar',
+                      band: 'Singer-Free Instrumental' as BandArchetype,
+                      vox: 'Singer-Free (Record Your Own Voice)' as VocalArrangement,
+                      brief:
+                        'Create a pure unplugged acoustic guitar and light percussion instrumental backing track ready for a singer-songwriter. Up to 3:50.',
+                    },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      onClick={() => {
+                        handleSelectBandArchetype(preset.band);
+                        setVocalArrangement(preset.vox);
+                        setPrompt(preset.brief);
+                        setIsHelperOpen(false);
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-white border border-gray-200 hover:border-blue-500 text-xs font-semibold text-gray-800 shadow-sm transition-colors"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </section>
 
-            <GenreSamples genre={selectedBand} owner={creatorHandle} onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setIsHelperOpen(false); }} />
+            <GenreSamples genre={activeTab === 'acoustic' ? 'Indie' : activeTab === 'singers' ? 'Pop Band' : selectedBand} owner={creatorHandle} onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setIsHelperOpen(false); }} />
             <div className="cw cw-actions mb-6"><button onClick={() => setActiveTab('library')}>Your private library ↗</button><button onClick={() => setActiveTab('creative')}>Ask for lyrics, video, or creative help ↗</button><button onClick={() => setActiveTab('listen')}>Explore all genres ↗</button></div>
             <section className="bg-white rounded-[36px] p-8 md:p-10 card-shadow border border-gray-200/80 mb-12 relative z-10">
               <div className="space-y-8">
@@ -1033,7 +1161,7 @@ const App: React.FC = () => {
                       01. Select Your Band Lineup or Custom Genre
                     </label>
                     <span className="text-xs text-gray-500 font-mono tabular-nums">
-                      Strict Radio Standard: 2:48 Maximum Song Length
+                      Hard Cutoff: 3:50 Maximum Song Length (Jingles & Spots Separate)
                     </span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1231,24 +1359,25 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Step 4: Radio Duration Cap (Max 2:48) & Lyrics Mode */}
+                {/* Step 4: Song Duration Cap (3:50 Hard Cutoff) & Lyrics Mode */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-700">
-                      Radio Duration Format (Capped at 2:48 Max)
+                      Song Duration Format (3:50 Hard Cutoff — Jingles Separate)
                     </label>
                     <div className="flex flex-wrap bg-gray-100 p-1 rounded-2xl w-fit gap-1">
                       {(
                         [
-                          '2:48 Radio Master (Max)',
+                          '3:50 Radio Master (Max)',
+                          '2:48 Radio Single',
                           '2:15 Tight Single',
-                          '0:30 Hook Preview',
+                          '0:30 Hook / Jingle',
                         ] as Duration[]
                       ).map((opt) => (
                         <button
                           key={opt}
                           onClick={() => setDuration(opt)}
-                          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 font-mono tabular-nums ${
+                          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 font-mono tabular-nums ${
                             duration === opt
                               ? 'bg-white shadow-sm text-gray-900'
                               : 'text-gray-600 hover:text-gray-900'
@@ -1336,7 +1465,7 @@ const App: React.FC = () => {
                         }`
                   }`}
                 >
-                  Generate {selectedBand === 'Custom Genre' ? customGenreName : selectedBand} Track (2:48 Max)
+                  Generate {selectedBand === 'Custom Genre' ? customGenreName : selectedBand} Track ({duration === '0:30 Hook / Jingle' || duration === '0:30 Hook Preview' ? '0:30 Jingle / Hook' : '3:50 Hard Cutoff'})
                 </button>
               </div>
             </section>
@@ -1356,7 +1485,7 @@ const App: React.FC = () => {
                 Creator Radio Stations & Syndication Hub
               </h1>
               <p className="text-base text-gray-500 max-w-3xl mx-auto">
-                Curate your own radio station combining 2:48 band songs, weekly mini-podcasts, and craft commercials. Share under safe studio handles and push directly to Spotify, YouTube, and Amazon Music.
+                Curate your own radio station combining band songs (up to 3:50 max), weekly mini-podcasts, and craft commercials. Share under safe studio handles and push directly to Spotify, YouTube, and Amazon Music.
               </p>
             </div>
 
@@ -1418,7 +1547,7 @@ const App: React.FC = () => {
                     <textarea
                       value={newStationTagline}
                       onChange={(e) => setNewStationTagline(e.target.value)}
-                      placeholder="2:48 max multi-singer hits, Wednesday 7-min mini-podcasts, and local craft spots."
+                      placeholder="Up to 3:50 multi-singer hits, Wednesday 7-min mini-podcasts, and local craft spots."
                       className="w-full h-20 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none"
                     />
                   </div>
@@ -2108,7 +2237,7 @@ const App: React.FC = () => {
         )}
 
         {/* ===================================================================== */}
-        {/* TAB 6: WEEKLY TRENDING GENRES & SONG THEMES (RECHARTS)                */}
+        {/* TAB 6: WEEKLY TRENDING GENRES, HOLIDAY HUB & SPECIALTY HUBS           */}
         {/* ===================================================================== */}
         {activeTab === 'trending' && (
           <TrendingView
@@ -2119,6 +2248,8 @@ const App: React.FC = () => {
               setIsHelperOpen(false);
               setActiveTab('bands');
             }}
+            onLoadHolidayTemplate={handleLoadHolidayTemplate}
+            onNavigateTab={(tab) => setActiveTab(tab)}
           />
         )}
 
@@ -2134,7 +2265,7 @@ const App: React.FC = () => {
                 Studio Creations & Kindness Community Feed
               </h2>
               <p className="text-xs text-gray-500">
-                Every creation displays its AI Material or Human Vocalist identifier, adheres to the 2:48 song / 10m podcast cap, and welcomes positive creator feedback under @handles.
+                Every creation displays its AI Material or Human Vocalist identifier, adheres to the 3:50 song hard cutoff (jingles/ads separate) or 10m podcast cap, and welcomes positive creator feedback under @handles.
               </p>
             </div>
             <span className="text-xs font-mono text-gray-500 tabular-nums">
@@ -2311,7 +2442,7 @@ const App: React.FC = () => {
                             onPlay={() => setIsResultPlaying(result.id)}
                             onPause={() => setIsResultPlaying(null)}
                             onTimeUpdate={(e) => {
-                              // Enforce 2:48 (168s) max duration cap on songs
+                              // Enforce 3:50 (230s) hard cutoff on songs
                               if (
                                 result.itemType !== 'podcast' &&
                                 e.currentTarget.currentTime > CONFIG.MAX_SONG_DURATION_SECONDS
@@ -2730,10 +2861,10 @@ const App: React.FC = () => {
 
               <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200">
                 <h4 className="font-bold text-sm text-gray-900 mb-1">
-                  3. 2:48 Song Cap & Weekly 5–10 Minute Podcast Discipline
+                  3. 3:50 Song Hard Cutoff (Jingles Separate) & Weekly 5–10 Minute Podcast Discipline
                 </h4>
                 <p>
-                  Songs are capped at <strong>2 minutes and 48 seconds</strong> so every track stays punchy and radio-ready. Mini-podcasts are strictly <strong>5 to 10 minutes</strong> and require a weekly schedule pledge so creators build loyal audiences without flooding platforms with 15 two-minute clips a day.
+                  Every song can run up to a hard cutoff of <strong>3 minutes and 50 seconds (3:50)</strong>, while jingles and commercial spots use dedicated short formats (<code>:30</code> and <code>:60</code>). Mini-podcasts are strictly <strong>5 to 10 minutes</strong> and require a weekly schedule pledge so creators build loyal audiences without flooding platforms with 15 two-minute clips a day.
                 </p>
               </div>
 

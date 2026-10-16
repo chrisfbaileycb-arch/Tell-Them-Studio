@@ -1,6 +1,9 @@
 export type Duration =
-  | '2:48 Radio Master (Max)'
+  | '3:50 Radio Master (Max)'
+  | '2:48 Radio Single'
   | '2:15 Tight Single'
+  | '0:30 Hook / Jingle'
+  | '2:48 Radio Master (Max)'
   | '0:30 Hook Preview'
   | 'Lyria 3.5'
   | 'Lyria 3 Pro'
@@ -12,6 +15,8 @@ export type LyricsOption = 'Auto' | 'Custom' | 'Instrumental';
 
 export type StudioTab =
   | 'bands'
+  | 'singers'
+  | 'acoustic'
   | 'stations'
   | 'podcasts'
   | 'commercials'

@@ -1,6 +1,6 @@
 {
   "name": "Tell Them Studio",
-  "description": "A trend-setting social creation studio for building custom radio stations, multi-singer band tracks (up to 2:48), scheduled 5–10 minute mini-podcasts, genuine craft commercials, and seasonal holiday hits ready to publish to Spotify, YouTube, and Amazon Music.",
+  "description": "A trend-setting social creation studio for building custom radio stations, multi-singer band tracks (up to 3:50), scheduled 5–10 minute mini-podcasts, genuine craft commercials, and seasonal holiday hits ready to publish to Spotify, YouTube, and Amazon Music.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
