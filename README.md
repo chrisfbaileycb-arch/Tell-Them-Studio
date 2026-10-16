@@ -51,6 +51,14 @@ Creative AI instructions redirect artist references toward general instrumentati
 
 ## Tests
 
-`npm test` runs five Playwright checks covering all WAV lengths/variation differences, API permission validation, playback, IndexedDB persistence, visibility/remix controls, audio imports/mixing, mocked AI lyric handoff, mobile overflow, unconfigured-service behavior, and actual WebM download. Live AI, browser speech synthesis, and voice transcription are not exercised.
+`npm test` runs eight Playwright checks covering all WAV lengths/variation differences, API permission validation, playback, IndexedDB persistence, visibility/remix controls, audio imports/mixing, mocked AI lyric handoff, mobile overflow, unconfigured-service behavior, and actual WebM download. Additional checks cover draft recovery after refresh, independent assistant conversations, jingle presets, manual upload acknowledgements, and optional podcast release planning. Live AI, browser speech synthesis, and voice transcription are not exercised.
 
 The test browser is distributed through npm (`@sparticuz/chromium`); the config extracts bundled Linux libraries into the OS temporary directory. Linux x64 is the sandbox target. Set `CHROMIUM_EXECUTABLE_PATH` for your own compatible browser on other systems. Test recordings/screenshots and build outputs are ignored by Git.
+
+## Workflow refinement
+
+The main navigation is Create, My Library, and Told Them · Listen. Create contains one Music & jingles workspace (Band, Vocals, Acoustic, and a 30-second Jingle preset), Podcasts, Commercials, Creative assistant, and Seasonal templates. Existing music hash links remain supported. The creative brief comes first; sound settings, inspiration sketches, and release-plan notes are optional expandable sections.
+
+Text drafts, lyric drafts, guided-builder settings, podcast/commercial briefs, and creative conversations are saved locally across navigation and refresh. Each assistant tool keeps its own conversation, with a clear action to remove it. Files, reference-audio permissions, binary attachments, and in-progress generation are not restored after reload. Library audio still uses IndexedDB; local drafts and library data are not cloud backups. Storage failures show a warning.
+
+Publishing is a manual download-and-upload workflow. Opening an external destination never marks a creation as uploaded. The optional upload checklist records your own unverified note for the current session. Radio and featured activity are local previews. Podcast release-plan fields are optional notes, not a scheduler or a prerequisite for creating audio. Generation durations are targets; review the finished file before use.

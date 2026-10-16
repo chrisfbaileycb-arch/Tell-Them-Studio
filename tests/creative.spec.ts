@@ -116,9 +116,8 @@ test("audio import, mix, lyrics handoff, and mobile layout", async ({
       .getByLabel("Import audio")
       .setInputFiles({ name, mimeType: "audio/wav", buffer: wav });
   await expect(page.locator(".cw-track")).toHaveCount(2);
-  await page
-    .getByRole("button", { name: "AI · Lyrics, Video & Mix", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByRole("button", { name: "Creative assistant", exact: true }).click();
   await page
     .getByRole("button", { name: "Mashup & vocals", exact: true })
     .click();
@@ -135,9 +134,8 @@ test("audio import, mix, lyrics handoff, and mobile layout", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "My Library", exact: true }).click();
   await expect(page.locator(".cw-track")).toHaveCount(3);
-  await page
-    .getByRole("button", { name: "AI · Lyrics, Video & Mix", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByRole("button", { name: "Creative assistant", exact: true }).click();
   await page
     .getByRole("button", { name: "Lyrics designer", exact: true })
     .click();
@@ -195,9 +193,8 @@ test("unconnected assistant is honest; visualizer exports real WebM", async ({
       buffer,
     });
   await expect(page.locator(".cw-track")).toHaveCount(1);
-  await page
-    .getByRole("button", { name: "AI · Lyrics, Video & Mix", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByRole("button", { name: "Creative assistant", exact: true }).click();
   await page
     .getByRole("button", { name: "Music video & anime", exact: true })
     .click();

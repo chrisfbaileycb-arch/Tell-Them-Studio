@@ -1,3 +1,4 @@
+import { useDraft } from "../hooks/useDraft";
 import React, {
   createContext,
   useContext,
@@ -409,17 +410,17 @@ export function CreativeWorkspace({
     [notice, setNotice] = useState("");
   const [rights, setRights] = useState(false),
     [busy, setBusy] = useState(false);
-  const [tool, setTool] = useState("Creative conversation"),
-    [input, setInput] = useState(""),
-    [reply, setReply] = useState("");
-  const [messages, setMessages] = useState<{ role: string; text: string }[]>(
-    [],
+  const [tool, setTool] = useDraft("creative-tool", "Creative conversation"),
+    [input, setInput] = useDraft(`creative:${tool}:input`, ""),
+    [reply, setReply] = useDraft(`creative:${tool}:reply`, "");
+  const [messages, setMessages] = useDraft<{ role: string; text: string }[]>(
+    `creative:${tool}:messages`, [],
   );
-  const [first, setFirst] = useState(""),
-    [second, setSecond] = useState(""),
-    [balance, setBalance] = useState(0.5),
-    [mixTitle, setMixTitle] = useState("My original mix");
-  const [videoId, setVideoId] = useState(""),
+  const [first, setFirst] = useDraft("mix-first", ""),
+    [second, setSecond] = useDraft("mix-second", ""),
+    [balance, setBalance] = useDraft("mix-balance", 0.5),
+    [mixTitle, setMixTitle] = useDraft("mix-title", "My original mix");
+  const [videoId, setVideoId] = useDraft("video-track", ""),
     [videoProgress, setVideoProgress] = useState<number | null>(null);
   const [reference, setReference] = useState<File | null>(null),
     [recording, setRecording] = useState(false);
@@ -936,8 +937,7 @@ export function CreativeWorkspace({
                 onClick={() => {
                   setTool(t);
                   setRights(false);
-                  setReply("");
-                  setMessages([]);
+                  setReference(null);
                   setNotice("");
                 }}
               >
@@ -948,7 +948,8 @@ export function CreativeWorkspace({
           </div>
           {tool !== "Mashup & vocals" && (
             <section className="cw-panel">
-              <h2>{tool}</h2>
+              <h2>{tool}</h2><p className="cw-note">Text drafts and conversations are saved in this browser per tool. Audio references must be selected again after leaving.</p>
+              <button disabled={busy} onClick={() => { if (window.confirm("Clear this tool’s conversation and draft?")) { setMessages([]); setInput(""); setReply(""); } }}>Clear this conversation</button>
               <p>
                 {tool === "Lyrics designer"
                   ? "Find a theme, shape verses, refine a chorus. AI drafts stay editable and can go directly into the song studio."
@@ -1009,6 +1010,7 @@ export function CreativeWorkspace({
               <label>
                 Your idea
                 <textarea
+                  aria-label="Your idea"
                   value={input}
                   maxLength={6000}
                   onChange={(e) => setInput(e.target.value)}
