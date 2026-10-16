@@ -7,7 +7,8 @@ import { GoogleGenAI, Modality, Type } from '@google/genai';
 
 loadEnv({ path: '.env.local', quiet: true });
 const app = express();
-const PORT = 3000;
+const portFlag = process.argv.indexOf('--port');
+const PORT = Number(process.env.PORT || (portFlag >= 0 ? process.argv[portFlag + 1] : 3000));
 
 app.use(express.json({ limit: '50mb' }));
 
@@ -402,7 +403,7 @@ Return JSON with:
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, ...(process.argv.includes('--strictPort') ? { hmr: false } : {}) },
       appType: 'spa',
     });
     app.use(vite.middlewares);

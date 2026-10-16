@@ -51,7 +51,7 @@ Creative AI instructions redirect artist references toward general instrumentati
 
 ## Tests
 
-`npm test` runs eight Playwright checks covering all WAV lengths/variation differences, API permission validation, playback, IndexedDB persistence, visibility/remix controls, audio imports/mixing, mocked AI lyric handoff, mobile overflow, unconfigured-service behavior, and actual WebM download. Additional checks cover draft recovery after refresh, independent assistant conversations, jingle presets, manual upload acknowledgements, and optional podcast release planning. Live AI, browser speech synthesis, and voice transcription are not exercised.
+`npm test` runs eleven Playwright checks covering all WAV lengths/variation differences, API permission validation, playback, IndexedDB persistence, visibility/remix controls, audio imports/mixing, mocked AI lyric handoff, mobile overflow, unconfigured-service behavior, and actual WebM download. Additional checks cover draft recovery after refresh, independent assistant conversations, jingle presets, manual upload acknowledgements, and optional podcast release planning. Live AI, browser speech synthesis, and voice transcription are not exercised.
 
 The test browser is distributed through npm (`@sparticuz/chromium`); the config extracts bundled Linux libraries into the OS temporary directory. Linux x64 is the sandbox target. Set `CHROMIUM_EXECUTABLE_PATH` for your own compatible browser on other systems. Test recordings/screenshots and build outputs are ignored by Git.
 
@@ -62,3 +62,10 @@ The main navigation is Create, My Library, and Told Them · Listen. Create conta
 Text drafts, lyric drafts, guided-builder settings, podcast/commercial briefs, and creative conversations are saved locally across navigation and refresh. Each assistant tool keeps its own conversation, with a clear action to remove it. Files, reference-audio permissions, binary attachments, and in-progress generation are not restored after reload. Library audio still uses IndexedDB; local drafts and library data are not cloud backups. Storage failures show a warning.
 
 Publishing is a manual download-and-upload workflow. Opening an external destination never marks a creation as uploaded. The optional upload checklist records your own unverified note for the current session. Radio and featured activity are local previews. Podcast release-plan fields are optional notes, not a scheduler or a prerequisite for creating audio. Generation durations are targets; review the finished file before use.
+
+
+## Music Studio visual direction
+
+The music-first dark studio uses visible genre and vocal-style choices, an original concert-guitar cover, a real audio waveform player, and a focused Create music action. Podcasts and commercial audio remain secondary tools. Short audio hooks are available under Short clip; seasonal templates remain under Explore more sounds. Existing drafts and library audio are preserved.
+
+Desktop and mobile review captures and the approved direction are in `docs/design/`. See `design-qa.md` for visual comparison, interaction checks, and known limits. `MusicStudio.tsx` isolates composition controls from `App.tsx`; `StudioPlayer.tsx` renders measured audio data with native playback fallback. No provider or model routing was changed.
