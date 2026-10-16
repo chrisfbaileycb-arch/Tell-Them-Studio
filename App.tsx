@@ -45,21 +45,41 @@ import { getRandomItem } from './src/utils/helpers';
 import { PromptBuilder, HelperSection } from './src/components/PromptBuilder';
 import { CreativeWorkspace, GenreSamples, PodcastSamples, SaveCreations } from './src/components/CreativeWorkspace';
 import { TrendingView } from './src/components/TrendingView';
+import { useDraft } from './src/hooks/useDraft';
 import { Hero } from './src/components/Hero';
 
+const normalizeRoute = (route: string): StudioTab => {
+  if (route === 'singers' || route === 'acoustic' || route === 'create') return 'bands';
+  return ['bands', 'stations', 'podcasts', 'commercials', 'holidays', 'trending', 'listen', 'library', 'creative'].includes(route) ? route as StudioTab : 'bands';
+};
 const App: React.FC = () => {
   // Active workspace tab
-  const [activeTab, setActiveTab] = useState<StudioTab>(() => { const route = window.location.hash.slice(1); return ['bands', 'singers', 'acoustic', 'stations', 'podcasts', 'commercials', 'holidays', 'trending', 'listen', 'library', 'creative'].includes(route) ? route as StudioTab : 'bands'; });
-
+  const [activeTab, setActiveTab] = useState<StudioTab>(() => normalizeRoute(window.location.hash.slice(1)));
+  const [musicPreset, setMusicPreset] = useDraft('music-preset', () => ['singers', 'acoustic'].includes(window.location.hash.slice(1)) ? window.location.hash.slice(1) : 'bands');
+  const [draftError, setDraftError] = useState(false);
   useEffect(() => {
     const onRoute = () => {
       const route = window.location.hash.slice(1);
-      if (['bands', 'singers', 'acoustic', 'stations', 'podcasts', 'commercials', 'holidays', 'trending', 'listen', 'library', 'creative'].includes(route)) setActiveTab(route as StudioTab);
+      if (route === 'singers' || route === 'acoustic') setMusicPreset(route);
+      setActiveTab(normalizeRoute(route));
     };
+    const onDraftError = () => setDraftError(true);
     window.addEventListener('hashchange', onRoute);
-    return () => window.removeEventListener('hashchange', onRoute);
+    window.addEventListener('studio-draft-error', onDraftError);
+    return () => { window.removeEventListener('hashchange', onRoute); window.removeEventListener('studio-draft-error', onDraftError); };
   }, []);
   useEffect(() => { window.history.replaceState(null, '', `#${activeTab}`); window.scrollTo({ top: 0, behavior: 'instant' }); }, [activeTab]);
+  const createTabs = ['bands', 'podcasts', 'commercials', 'creative', 'holidays'];
+  const isCreate = createTabs.includes(activeTab);
+  const selectMusicPreset = (preset: string) => {
+    setMusicPreset(preset);
+    setActiveTab('bands');
+    if (preset === 'singers') { handleSelectBandArchetype('Pop Band'); setVocalArrangement('Multi-Singer Trade-Off (Male & Female)'); }
+    if (preset === 'acoustic') { handleSelectBandArchetype('Indie'); setVocalArrangement('Dual Female Lead & Harmony'); }
+    if (preset === 'bands') handleSelectBandArchetype('Rock Band');
+    if (preset === 'jingle') { setDuration('0:30 Hook / Jingle'); setPrompt('Create a short, memorable original jingle for my business. Include the brand name, one clear benefit, and a catchy closing hook.'); setIsHelperOpen(false); }
+    else setDuration('3:50 Radio Master (Max)');
+  };
 
   // Creator Handle (Safe handle-only identity, no personal info)
   const [creatorHandle, setCreatorHandle] = useState(() => { try { return localStorage.getItem('tell-them-handle') || '@studio_voyager'; } catch { return '@studio_voyager'; } });
@@ -68,18 +88,18 @@ const App: React.FC = () => {
   const [handleDraft, setHandleDraft] = useState('@studio_voyager');
 
   // Band & Song Studio States
-  const [selectedBand, setSelectedBand] = useState<BandArchetype>('Rock Band');
-  const [customGenreName, setCustomGenreName] = useState('Upbeat Brass-Rock Fusion');
-  const [vocalArrangement, setVocalArrangement] = useState<VocalArrangement>(
+  const [selectedBand, setSelectedBand] = useDraft<BandArchetype>('selectedBand', 'Rock Band');
+  const [customGenreName, setCustomGenreName] = useDraft('customGenreName', 'Upbeat Brass-Rock Fusion');
+  const [vocalArrangement, setVocalArrangement] = useDraft<VocalArrangement>('vocalArrangement',
     'Multi-Singer Trade-Off (Male & Female)'
   );
-  const [prompt, setPrompt] = useState(
+  const [prompt, setPrompt] = useDraft('prompt',
     'Create an upbeat, radio-ready Rock Band song with male and female singers trading verses and harmonizing on an anthemic hometown pride chorus.'
   );
-  const [isPromptManual, setIsPromptManual] = useState(false);
-  const [duration, setDuration] = useState<Duration>('3:50 Radio Master (Max)');
-  const [lyricsOption, setLyricsOption] = useState<LyricsOption>('Auto');
-  const [customLyrics, setCustomLyrics] = useState('');
+  const [isPromptManual, setIsPromptManual] = useDraft('isPromptManual', false);
+  const [duration, setDuration] = useDraft<Duration>('duration', '3:50 Radio Master (Max)');
+  const [lyricsOption, setLyricsOption] = useDraft<LyricsOption>('lyricsOption', 'Auto');
+  const [customLyrics, setCustomLyrics] = useDraft('customLyrics', '');
   const [selectedImages, setSelectedImages] = useState<
     { data: string; mimeType: string; previewUrl: string }[]
   >([]);
@@ -87,7 +107,7 @@ const App: React.FC = () => {
   const [ipRespectConfirmed, setIpRespectConfirmed] = useState(true);
 
   // Results & Community Gallery
-  const [gen, setGen] = useState<GenerationState>({ results: INITIAL_COMMUNITY_SONGS });
+  const [gen, setGen] = useState<GenerationState>({ results: INITIAL_COMMUNITY_SONGS.map(item => ({ ...item, publishedPlatforms: [] })) });
   const [isResultPlaying, setIsResultPlaying] = useState<string | null>(null);
   const [encodingVideoId, setEncodingVideoId] = useState<string | null>(null);
   const [encodingProgress, setEncodingProgress] = useState(0);
@@ -113,31 +133,30 @@ const App: React.FC = () => {
     Record<string, PraiseComment['badge']>
   >({});
 
-  // Mini-Podcast Studio States (5 to 10 mins max, mandatory weekly schedule)
-  const [podcastShowTitle, setPodcastShowTitle] = useState('Backstage Band & Radio Weekly');
-  const [podcastTopic, setPodcastTopic] = useState(
+  // Mini-Podcast Studio States (5 to 10 mins max, optional release notes)
+  const [podcastShowTitle, setPodcastShowTitle] = useDraft('podcastShowTitle', 'Backstage Band & Radio Weekly');
+  const [podcastTopic, setPodcastTopic] = useDraft('podcastTopic',
     'How multi-singer rock and disco bands craft unforgettable radio hooks within the 3:50 song cutoff'
   );
-  const [podcastTargetMinutes, setPodcastTargetMinutes] = useState<number>(7);
-  const [podcastDay, setPodcastDay] = useState('Every Wednesday');
-  const [podcastTime, setPodcastTime] = useState('08:00 AM EST');
-  const [podcastHostA, setPodcastHostA] = useState('Alex');
-  const [podcastHostAVoice, setPodcastHostAVoice] = useState('Puck');
-  const [podcastHostB, setPodcastHostB] = useState('Sam');
-  const [podcastHostBVoice, setPodcastHostBVoice] = useState('Kore');
-  const [weeklySchedulePledge, setWeeklySchedulePledge] = useState(true);
+  const [podcastTargetMinutes, setPodcastTargetMinutes] = useDraft<number>('podcastTargetMinutes', 7);
+  const [podcastDay, setPodcastDay] = useDraft('podcastDay', 'Every Wednesday');
+  const [podcastTime, setPodcastTime] = useDraft('podcastTime', '08:00 AM EST');
+  const [podcastHostA, setPodcastHostA] = useDraft('podcastHostA', 'Alex');
+  const [podcastHostAVoice, setPodcastHostAVoice] = useDraft('podcastHostAVoice', 'Puck');
+  const [podcastHostB, setPodcastHostB] = useDraft('podcastHostB', 'Sam');
+  const [podcastHostBVoice, setPodcastHostBVoice] = useDraft('podcastHostBVoice', 'Kore');
   const [isGeneratingPodcast, setIsGeneratingPodcast] = useState(false);
 
   // Commercial Craft Studio States (True Ad Craft, PG & Broadcast Standards, No Avatars/Impersonation)
-  const [adBrandName, setAdBrandName] = useState('Three Rivers Vinyl & Coffee');
-  const [adOffering, setAdOffering] = useState(
+  const [adBrandName, setAdBrandName] = useDraft('adBrandName', 'Three Rivers Vinyl & Coffee');
+  const [adOffering, setAdOffering] = useDraft('adOffering',
     'Locally roasted morning espresso and weekend live acoustic band showcases'
   );
-  const [adAudience, setAdAudience] = useState('Music lovers, local families, and morning commuters');
-  const [adTone, setAdTone] = useState('Warm, witty, upbeat classic radio craft');
-  const [adCta, setAdCta] = useState('Visit Three Rivers Vinyl on Penn Ave this Saturday morning!');
-  const [adSpotLength, setAdSpotLength] = useState<'30s' | '60s'>('30s');
-  const [adVoice, setAdVoice] = useState('Fenrir');
+  const [adAudience, setAdAudience] = useDraft('adAudience', 'Music lovers, local families, and morning commuters');
+  const [adTone, setAdTone] = useDraft('adTone', 'Warm, witty, upbeat classic radio craft');
+  const [adCta, setAdCta] = useDraft('adCta', 'Visit Three Rivers Vinyl on Penn Ave this Saturday morning!');
+  const [adSpotLength, setAdSpotLength] = useDraft<'30s' | '60s'>('adSpotLength', '30s');
+  const [adVoice, setAdVoice] = useDraft('adVoice', 'Fenrir');
   const [adStandardsPledge, setAdStandardsPledge] = useState(true);
   const [isGeneratingCommercial, setIsGeneratingCommercial] = useState(false);
 
@@ -159,8 +178,8 @@ const App: React.FC = () => {
   const [isStandardsModalOpen, setIsStandardsModalOpen] = useState(false);
 
   // Helper Mode States
-  const [isHelperOpen, setIsHelperOpen] = useState(false);
-  const [helperSections, setHelperSections] = useState<HelperSection[]>([
+  const [isHelperOpen, setIsHelperOpen] = useDraft('isHelperOpen', false);
+  const [helperSections, setHelperSections] = useDraft<HelperSection[]>('helperSections', [
     {
       id: 'initial',
       type: 'main',
@@ -389,7 +408,7 @@ const App: React.FC = () => {
 
     addLog(
       newId,
-      `Initializing ${genreDescription} (${activeVocals}) — ${isClip ? '0:30 Jingle/Hook mode' : 'enforcing 3:50 hard cutoff for songs'}...`
+      `Initializing ${genreDescription} (${activeVocals}) — ${isClip ? '0:30 Jingle/Hook mode' : 'requesting a song up to the 3:50 target'}...`
     );
     addLog(
       newId,
@@ -423,7 +442,7 @@ const App: React.FC = () => {
         lyrics: lyrics || (isSingerFree ? 'Instrumental Band Backing Track (Ready for Your Voice)' : ''),
         metadata: metadata || r.metadata,
       }));
-      addLog(newId, isClip ? 'Jingle / hook stream captured.' : 'Master audio stream captured and verified under 3:50 hard song cutoff.');
+      addLog(newId, isClip ? 'Jingle / hook stream captured.' : 'Audio received. Duration is a generation target; review the actual playback length before export.');
 
       const title = await generateSongTitle(activePrompt, lyrics || activePrompt);
       updateResult(newId, (r) => ({ ...r, title }));
@@ -442,12 +461,6 @@ const App: React.FC = () => {
 
   // Generate 5-10 Minute Scheduled Mini-Podcast
   const handleGeneratePodcast = async () => {
-    if (!weeklySchedulePledge) {
-      setSafetyFeedback(
-        'Please confirm the Weekly Consistency & Anti-Spam Schedule Pledge before producing your mini-podcast.'
-      );
-      return;
-    }
     if (podcastTargetMinutes < 5 || podcastTargetMinutes > 10) {
       setSafetyFeedback('Mini-podcasts must be between 5 and 10 minutes (10 minutes max).');
       return;
@@ -467,7 +480,7 @@ const App: React.FC = () => {
       status: 'generating',
       logs: [
         `[Podcast Studio] Scripting ${podcastTargetMinutes}-minute episode for "${podcastShowTitle}"...`,
-        `[Schedule Verified] Committed to ${podcastDay} at ${podcastTime} (No daily micro-clip spamming).`,
+        `[Release notes only] ${podcastDay} at ${podcastTime}. No automatic scheduling is connected.`,
       ],
       audioUrl: null,
       coverImageUrl: createStudioCoverSvg('#0f172a', '#1e3a8a', '#38bdf8', 'podcast'),
@@ -491,7 +504,7 @@ const App: React.FC = () => {
         dayOfWeek: podcastDay,
         timeOfDay: podcastTime,
         targetMinutes: podcastTargetMinutes,
-        committedWeekly: true,
+        committedWeekly: false,
       },
       originalPrompt: podcastTopic,
       originalDuration: '3:50 Radio Master (Max)',
@@ -901,14 +914,14 @@ const App: React.FC = () => {
     >
       {/* Subtle Top Grid Backdrop across the site */}
       <div
-        className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[560px] opacity-75 
-        bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] 
-        bg-[size:6rem_5rem] 
+        className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[560px] opacity-75
+        bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)]
+        bg-[size:6rem_5rem]
         [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]"
       />
 
       {/* Top Navigation Bar — Strict 3-Zone Contract */}
-      <header className="sticky top-0 z-50 glass border-b border-gray-200/70 h-16 flex items-center justify-between gap-8 px-6">
+      <header className="sticky top-0 z-50 glass border-b border-gray-200/70 min-h-16 py-3 flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6">
         {/* Zone 1: Single text element wordmark */}
         <a
           href="#top"
@@ -921,66 +934,14 @@ const App: React.FC = () => {
           Tell Them Studio
         </a>
 
-        {/* Zone 2: 5 concise single-line text navigation links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-          <button
-            onClick={() => setActiveTab('bands')}
-            className={`hover:text-gray-950 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
-              activeTab === 'bands'
-                ? 'border-zinc-950 text-gray-950 font-semibold'
-                : 'border-transparent'
-            }`}
-          >
-            Band Studio
-          </button>
-          <button
-            onClick={() => {
-              setSelectedBand('Pop Band');
-              setVocalArrangement('Multi-Singer Trade-Off (Male & Female)');
-              setActiveTab('singers');
-            }}
-            className={`hover:text-gray-950 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
-              activeTab === 'singers'
-                ? 'border-zinc-950 text-gray-950 font-semibold'
-                : 'border-transparent'
-            }`}
-          >
-            Singer Studio
-          </button>
-          <button
-            onClick={() => {
-              setSelectedBand('Indie');
-              setVocalArrangement('Dual Female Lead & Harmony');
-              setActiveTab('acoustic');
-            }}
-            className={`hover:text-gray-950 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
-              activeTab === 'acoustic'
-                ? 'border-zinc-950 text-gray-950 font-semibold'
-                : 'border-transparent'
-            }`}
-          >
-            Acoustic Studio
-          </button>
-          <button
-            onClick={() => setActiveTab('stations')}
-            className={`hover:text-gray-950 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
-              activeTab === 'stations'
-                ? 'border-zinc-950 text-gray-950 font-semibold'
-                : 'border-transparent'
-            }`}
-          >
-            Radio Stations
-          </button>
-          <button
-            onClick={() => setActiveTab('trending')}
-            className={`hover:text-gray-950 transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
-              activeTab === 'trending'
-                ? 'border-zinc-950 text-gray-950 font-semibold'
-                : 'border-transparent'
-            }`}
-          >
-            Trending
-          </button>
+        <nav aria-label="Main navigation" className="order-3 w-full sm:order-none sm:w-auto flex flex-wrap gap-2 text-sm">
+          {[
+            { label: 'Create', tab: 'bands', active: isCreate },
+            { label: 'My Library', tab: 'library', active: activeTab === 'library' },
+            { label: 'Told Them · Listen', tab: 'listen', active: !isCreate && activeTab !== 'library' },
+          ].map(item => <button key={item.tab} aria-current={item.active ? 'page' : undefined}
+            onClick={() => setActiveTab(item.tab as StudioTab)}
+            className={`rounded-xl px-3 py-2 font-semibold ${item.active ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{item.label}</button>)}
         </nav>
 
         {/* Zone 3: 1 primary action */}
@@ -989,7 +950,7 @@ const App: React.FC = () => {
             onClick={() => setIsStandardsModalOpen(true)}
             className="px-4 py-2 text-xs font-semibold text-white bg-zinc-950 rounded-xl hover:bg-zinc-900 transition-colors whitespace-nowrap shrink-0"
           >
-            Safety & Artist Charter
+            Studio guidelines
           </button>
         </div>
       </header>
@@ -1032,46 +993,26 @@ const App: React.FC = () => {
                 {creatorHandle} (Change Handle)
               </button>
             )}
-            <span aria-hidden="true">·</span>
-            <span>Handle-Only Safe Community</span>
-            <span aria-hidden="true">·</span>
-            <span className="font-mono tabular-nums">Songs Max 3:50 (Jingles Separate)</span>
-            <span aria-hidden="true">·</span>
-            <span className="font-mono tabular-nums">Weekly Podcasts 5–10m</span>
-            <span aria-hidden="true">·</span>
-            <span>AI Material Disclosure Active</span>
+            <span>Drafts and library stay in this browser.</span>
           </div>
 
-          {/* Segmented Mode Control for all viewports */}
-          <div className="flex flex-wrap items-center gap-1 p-1 bg-gray-100 rounded-xl">
-            {(
-              [
-                { id: 'listen', label: 'Told Them · Listen' },
-                { id: 'bands', label: 'Band Studio' },
-                { id: 'singers', label: 'Singer Studio' },
-                { id: 'acoustic', label: 'Acoustic Studio' },
-                { id: 'creative', label: 'AI · Lyrics, Video & Mix' },
-                { id: 'library', label: 'My Library' },
-                { id: 'stations', label: 'Radio Stations' },
-                { id: 'podcasts', label: 'Mini-Podcasts (5–10m)' },
-                { id: 'commercials', label: 'Commercial Craft' },
-                { id: 'trending', label: 'Trending' },
-              ] as { id: StudioTab; label: string }[]
-            ).map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
-                  activeTab === t.id
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
         </div>
+        {draftError && <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm">Draft saving is unavailable or storage is full. Keep this page open and copy your text before leaving.</p>}
+        {activeTab !== 'library' && <nav aria-label={isCreate ? 'Creation tools' : 'Listening tools'} className="mb-6 flex flex-wrap gap-2">
+          {(isCreate ? [
+            { id: 'bands', label: 'Music & jingles' },
+            { id: 'podcasts', label: 'Podcasts' },
+            { id: 'commercials', label: 'Commercials' },
+            { id: 'creative', label: 'Creative assistant' },
+            { id: 'holidays', label: 'Seasonal templates' },
+          ] : [
+            { id: 'listen', label: 'Discover' },
+            { id: 'stations', label: 'Radio preview' },
+            { id: 'trending', label: 'Featured demos' },
+          ]).map(item => <button key={item.id} aria-current={activeTab === item.id ? 'page' : undefined} onClick={() => setActiveTab(item.id as StudioTab)}
+            className={`rounded-xl border px-4 py-2 text-sm ${activeTab === item.id ? 'border-gray-900 bg-gray-100 font-semibold' : 'border-gray-200'}`}>{item.label}</button>)}
+        </nav>}
+        {['listen', 'stations', 'trending'].includes(activeTab) && <p className="mb-4 text-sm text-gray-600">Local listening preview · demo activity and this browser’s shared tracks. Nothing is published online.</p>}
 
         {/* Kindness & Safety Alert Banner */}
         {safetyFeedback && (
@@ -1090,51 +1031,29 @@ const App: React.FC = () => {
         )}
 
         {(['listen', 'library', 'creative'] as string[]).includes(activeTab) && (
-          <CreativeWorkspace key={activeTab} mode={activeTab as 'listen' | 'library' | 'creative'} owner={creatorHandle}
+          <CreativeWorkspace mode={activeTab as 'listen' | 'library' | 'creative'} owner={creatorHandle}
             onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setIsHelperOpen(false); setActiveTab('bands'); }}
             onPodcast={() => setActiveTab('podcasts')}
             onLyrics={(lyrics) => { setCustomLyrics(lyrics); setLyricsOption('Custom'); setIsHelperOpen(false); setActiveTab('bands'); }} />
         )}
-        {activeTab === 'podcasts' && <><PodcastSamples /><div className="cw cw-actions"><button onClick={() => setActiveTab('library')}>Your podcast library ↗</button><button onClick={() => setActiveTab('creative')}>Discuss an episode idea ↗</button></div></>}
-        {activeTab === 'commercials' && <GenreSamples genre="Pop Band" owner={creatorHandle} onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setActiveTab('bands'); }} />}
+        {activeTab === 'podcasts' && <><details className="mb-4"><summary>Listen to podcast sketches</summary><PodcastSamples /></details><div className="cw cw-actions"><button onClick={() => setActiveTab('library')}>Your podcast library ↗</button><button onClick={() => setActiveTab('creative')}>Discuss an episode idea ↗</button></div></>}
+
 
         {/* ===================================================================== */}
         {/* TAB 1: BAND STUDIO, SINGER STUDIO & ACOUSTIC STUDIO                   */}
         {/* ===================================================================== */}
-        {(activeTab === 'bands' || activeTab === 'singers' || activeTab === 'acoustic') && (
+        {activeTab === 'bands' && (
           <>
-            <Hero
-              eyebrow={
-                activeTab === 'singers'
-                  ? 'Singer Studio · Lead Vocals, Duets & Live Voice (3:50 Max)'
-                  : activeTab === 'acoustic'
-                  ? 'Acoustic Studio · Unplugged Guitar, Piano & Voice (3:50 Max)'
-                  : 'Band Studio · Multi-Singer Lineups, Custom Genres & Radio Singles'
-              }
-              title={
-                activeTab === 'singers'
-                  ? 'Singer Studio: Lead Vocals, Duets & Live Voice'
-                  : activeTab === 'acoustic'
-                  ? 'Acoustic Studio: Unplugged Guitar, Piano & Voice'
-                  : 'Build Your Band, Vocal Lineup & Radio Single'
-              }
-              subtitle={
-                activeTab === 'singers'
-                  ? 'Craft vocal-forward solos, male and female duets, 3-part harmonies, or record your own live voice over studio backing tracks—every song can run up to the 3 minutes and 50 seconds (3:50) hard cutoff.'
-                  : activeTab === 'acoustic'
-                  ? 'Create warm fingerstyle acoustic guitar sessions, upright piano ballads, folk harmonies, and intimate coffeehouse tracks up to the 3 minutes and 50 seconds (3:50) hard cutoff.'
-                  : 'Explore Rock, Country, Rap, Hip-Hop, Indie, Jazz, anime-inspired music, and Serenity—or create singer-free backing tracks for your own voice. Every song can run up to a hard cutoff of 3 minutes and 50 seconds (3:50) (with separate shorter formats for jingles and commercials) and is ready to publish to Spotify, YouTube, and Amazon Music.'
-              }
-              ctaLabel={
-                activeTab === 'singers'
-                  ? 'Open Singer Studio'
-                  : activeTab === 'acoustic'
-                  ? 'Open Acoustic Studio'
-                  : 'Start Creating Below'
-              }
-              ctaHref="#studio-workspace"
-            >
-              {activeTab === 'singers' && (
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold">Music & jingles</h1>
+              <p className="mt-2 text-sm text-gray-600">Start with your idea. Adjust the sound, generate, then review and save or export.</p>
+              <div role="group" aria-label="Music presets" className="mt-4 flex flex-wrap gap-2">
+                {[['bands', 'Band'], ['singers', 'Vocals'], ['acoustic', 'Acoustic'], ['jingle', 'Jingle · 30 seconds']].map(([id, label]) =>
+                  <button key={id} aria-pressed={musicPreset === id} onClick={() => selectMusicPreset(id)} className={`rounded-xl border px-4 py-2 text-sm ${musicPreset === id ? 'bg-gray-900 text-white' : 'bg-white'}`}>{label}</button>)}
+              </div>
+            </div>
+            <details className="mb-4"><summary className="cursor-pointer text-sm font-semibold">Preset inspiration</summary>
+              {musicPreset === 'singers' && (
                 <div className="pt-2 flex flex-wrap justify-center gap-2">
                   {[
                     {
@@ -1189,7 +1108,7 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {activeTab === 'acoustic' && (
+              {musicPreset === 'acoustic' && (
                 <div className="pt-2 flex flex-wrap justify-center gap-2">
                   {[
                     {
@@ -1236,20 +1155,138 @@ const App: React.FC = () => {
                   ))}
                 </div>
               )}
-            </Hero>
+            </details>
 
-            <GenreSamples genre={activeTab === 'acoustic' ? 'Indie' : activeTab === 'singers' ? 'Pop Band' : selectedBand} owner={creatorHandle} onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setIsHelperOpen(false); }} />
-            <div className="cw cw-actions mb-6"><button onClick={() => setActiveTab('library')}>Your private library ↗</button><button onClick={() => setActiveTab('creative')}>Ask for lyrics, video, or creative help ↗</button><button onClick={() => setActiveTab('listen')}>Explore all genres ↗</button></div>
             <section id="studio-workspace" className="bg-white rounded-[36px] p-8 md:p-10 card-shadow border border-gray-200/80 mb-12 relative z-10">
               <div className="space-y-8">
+                {/* Step 3: Prompt Builder / Free Text */}
+                <div className="space-y-3">
+                  <div className="flex flex-wrap justify-between items-center gap-2">
+                    <label className="text-sm font-bold text-gray-900">
+                      1. Describe your idea
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => {
+                          setPrompt(
+                            'Create an upbeat Rock Band hometown football pride anthem in black and gold with male and female singers trading verses and an electric stadium chorus. Use 100% original royalty-safe lyrics celebrating our city rivers, steel bridges, and Friday night energy.'
+                          );
+                          setIsHelperOpen(false);
+                        }}
+                        className="text-xs font-semibold text-gray-600 hover:text-blue-600 transition-colors"
+                      >
+                        Load Royalty-Safe Hometown Anthem Example
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsHelperOpen(!isHelperOpen);
+                        }}
+                        className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1.5"
+                      >
+                        <Icons.Sparkles className="w-3.5 h-3.5" />
+                        {isHelperOpen ? 'Switch to Free Text' : 'Guided Song Builder'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative group/prompt min-h-[150px]">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageUpload}
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                    />
+                    {isHelperOpen ? (
+                      <PromptBuilder
+                        isHelperOpen={isHelperOpen}
+                        helperSections={helperSections}
+                        setHelperSections={setHelperSections}
+                        activeSelector={activeSelector}
+                        setActiveSelector={setActiveSelector}
+                        selectedImages={selectedImages}
+                        onImageSelect={() => fileInputRef.current?.click()}
+                        onImageRemove={removeImage}
+                      />
+                    ) : (
+                      <div className="relative">
+                        <textarea
+                          aria-label="Creative brief"
+                          ref={promptTextareaRef}
+                          value={prompt}
+                          onChange={(e) => {
+                            setPrompt(e.target.value);
+                            setIsPromptManual(true);
+                          }}
+                          onKeyDown={handleKeyDown}
+                          placeholder="Describe your band's groove, how the male and female singers trade verses, or the hometown story..."
+                          className="w-full min-h-[128px] bg-gray-50 border border-gray-200 rounded-3xl p-6 pb-20 text-lg font-normal leading-relaxed resize-none focus:bg-white transition-all pr-16"
+                          style={{ overflow: 'hidden' }}
+                        />
+                        <div className="mt-2 sm:absolute sm:bottom-4 sm:left-4 flex items-center gap-2">
+                          {selectedImages.length < 10 && (
+                            <button
+                              onClick={() => fileInputRef.current?.click()}
+                              className={`transition-all shadow-sm border border-gray-200 flex items-center justify-center ${
+                                selectedImages.length > 0
+                                  ? 'p-2.5 rounded-2xl bg-blue-600 text-white'
+                                  : 'px-4 py-2 rounded-2xl bg-white text-gray-600 hover:text-blue-600 gap-2 text-xs font-semibold'
+                              }`}
+                            >
+                              <Icons.Camera className="w-4 h-4" />
+                              {selectedImages.length === 0 && <span>Add Visual Inspiration</span>}
+                            </button>
+                          )}
+                          {selectedImages.length > 0 && (
+                            <div className="flex gap-2">
+                              {selectedImages.map((img, idx) => (
+                                <div
+                                  key={idx}
+                                  className="relative w-11 h-11 rounded-xl overflow-hidden border border-gray-200 shadow-sm"
+                                >
+                                  <img
+                                    src={img.previewUrl}
+                                    alt="Reference"
+                                    referrerPolicy="no-referrer"
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <button
+                                    onClick={() => removeImage(idx)}
+                                    className="absolute top-0 right-0 w-4 h-4 bg-black/60 text-white flex items-center justify-center"
+                                  >
+                                    <Icons.X className="w-2.5 h-2.5" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-2 sm:absolute sm:bottom-4 sm:right-4">
+                          <button
+                            title="Generate a fresh band concept"
+                            onClick={handleFeelingLucky}
+                            className="px-3.5 py-2 bg-white shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 rounded-2xl text-xs font-semibold flex items-center gap-1.5 transition-transform active:scale-95"
+                          >
+                            <Icons.Sparkles className="w-4 h-4" />
+                            <span>Surprise Band Idea</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <details><summary className="cursor-pointer text-sm font-semibold">Sound settings · genre and vocals</summary>
                 {/* Step 1: Band Archetype & Custom Genre */}
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label className="text-sm font-bold text-gray-900">
-                      01. Select Your Band Lineup or Custom Genre
+                      Genre & instrumentation
                     </label>
                     <span className="text-xs text-gray-500 font-mono tabular-nums">
-                      Hard Cutoff: 3:50 Maximum Song Length (Jingles & Spots Separate)
+                      Duration is a target. Check the finished audio.
                     </span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1301,7 +1338,7 @@ const App: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label className="text-sm font-bold text-gray-900">
-                      02. Choose Multi-Singer Vocal Interplay or Singer-Free Mode
+                      Vocals
                     </label>
                     <span className="text-xs text-gray-500">
                       Have your own voice? Pick Singer-Free or record your live vocals over any generated band!
@@ -1329,129 +1366,12 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Step 3: Prompt Builder / Free Text */}
-                <div className="space-y-3">
-                  <div className="flex flex-wrap justify-between items-center gap-2">
-                    <label className="text-sm font-bold text-gray-900">
-                      03. Song Concept & Arrangement Direction
-                    </label>
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => {
-                          setPrompt(
-                            'Create an upbeat Rock Band hometown football pride anthem in black and gold with male and female singers trading verses and an electric stadium chorus. Use 100% original royalty-safe lyrics celebrating our city rivers, steel bridges, and Friday night energy.'
-                          );
-                          setIsHelperOpen(false);
-                        }}
-                        className="text-xs font-semibold text-gray-600 hover:text-blue-600 transition-colors"
-                      >
-                        Load Royalty-Safe Hometown Anthem Example
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsHelperOpen(!isHelperOpen);
-                        }}
-                        className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1.5"
-                      >
-                        <Icons.Sparkles className="w-3.5 h-3.5" />
-                        {isHelperOpen ? 'Switch to Free Text' : 'Guided Song Builder'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="relative group/prompt min-h-[150px]">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleImageUpload}
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                    />
-                    {isHelperOpen ? (
-                      <PromptBuilder
-                        isHelperOpen={isHelperOpen}
-                        helperSections={helperSections}
-                        setHelperSections={setHelperSections}
-                        activeSelector={activeSelector}
-                        setActiveSelector={setActiveSelector}
-                        selectedImages={selectedImages}
-                        onImageSelect={() => fileInputRef.current?.click()}
-                        onImageRemove={removeImage}
-                      />
-                    ) : (
-                      <div className="relative">
-                        <textarea
-                          ref={promptTextareaRef}
-                          value={prompt}
-                          onChange={(e) => {
-                            setPrompt(e.target.value);
-                            setIsPromptManual(true);
-                          }}
-                          onKeyDown={handleKeyDown}
-                          placeholder="Describe your band's groove, how the male and female singers trade verses, or the hometown story..."
-                          className="w-full min-h-[128px] bg-gray-50 border border-gray-200 rounded-3xl p-6 pb-20 text-lg font-normal leading-relaxed resize-none focus:bg-white transition-all pr-16"
-                          style={{ overflow: 'hidden' }}
-                        />
-                        <div className="absolute bottom-4 left-4 flex items-center gap-2">
-                          {selectedImages.length < 10 && (
-                            <button
-                              onClick={() => fileInputRef.current?.click()}
-                              className={`transition-all shadow-sm border border-gray-200 flex items-center justify-center ${
-                                selectedImages.length > 0
-                                  ? 'p-2.5 rounded-2xl bg-blue-600 text-white'
-                                  : 'px-4 py-2 rounded-2xl bg-white text-gray-600 hover:text-blue-600 gap-2 text-xs font-semibold'
-                              }`}
-                            >
-                              <Icons.Camera className="w-4 h-4" />
-                              {selectedImages.length === 0 && <span>Add Visual Inspiration</span>}
-                            </button>
-                          )}
-                          {selectedImages.length > 0 && (
-                            <div className="flex gap-2">
-                              {selectedImages.map((img, idx) => (
-                                <div
-                                  key={idx}
-                                  className="relative w-11 h-11 rounded-xl overflow-hidden border border-gray-200 shadow-sm"
-                                >
-                                  <img
-                                    src={img.previewUrl}
-                                    alt="Reference"
-                                    referrerPolicy="no-referrer"
-                                    className="w-full h-full object-cover"
-                                  />
-                                  <button
-                                    onClick={() => removeImage(idx)}
-                                    className="absolute top-0 right-0 w-4 h-4 bg-black/60 text-white flex items-center justify-center"
-                                  >
-                                    <Icons.X className="w-2.5 h-2.5" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="absolute bottom-4 right-4">
-                          <button
-                            title="Generate a fresh band concept"
-                            onClick={handleFeelingLucky}
-                            className="px-3.5 py-2 bg-white shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 rounded-2xl text-xs font-semibold flex items-center gap-1.5 transition-transform active:scale-95"
-                          >
-                            <Icons.Sparkles className="w-4 h-4" />
-                            <span>Surprise Band Idea</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
+                </details>
                 {/* Step 4: Song Duration Cap (3:50 Hard Cutoff) & Lyrics Mode */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-700">
-                      Song Duration Format (3:50 Hard Cutoff — Jingles Separate)
+                      2. Choose a target length
                     </label>
                     <div className="flex flex-wrap bg-gray-100 p-1 rounded-2xl w-fit gap-1">
                       {(
@@ -1481,7 +1401,7 @@ const App: React.FC = () => {
                     <label className="text-xs font-bold text-gray-700">
                       Lyrics & Vocal Mode
                     </label>
-                    <div className="flex bg-gray-100 p-1 rounded-2xl w-fit gap-1">
+                    <div className="flex flex-wrap bg-gray-100 p-1 rounded-2xl w-fit max-w-full gap-1">
                       {(['Auto', 'Custom', 'Instrumental'] as LyricsOption[]).map((opt) => (
                         <button
                           key={opt}
@@ -1553,10 +1473,14 @@ const App: React.FC = () => {
                         }`
                   }`}
                 >
-                  Generate {selectedBand === 'Custom Genre' ? customGenreName : selectedBand} Track ({duration === '0:30 Hook / Jingle' || duration === '0:30 Hook Preview' ? '0:30 Jingle / Hook' : '3:50 Hard Cutoff'})
+                  Generate {selectedBand === 'Custom Genre' ? customGenreName : selectedBand} Track ({duration === '0:30 Hook / Jingle' || duration === '0:30 Hook Preview' ? '0:30 Jingle / Hook' : 'song target'})
                 </button>
               </div>
             </section>
+            <details className="mb-8"><summary className="cursor-pointer text-sm font-semibold">Need inspiration? Listen to sketches</summary>
+            <GenreSamples genre={musicPreset === 'acoustic' ? 'Indie' : musicPreset === 'singers' ? 'Pop Band' : selectedBand} owner={creatorHandle} onCreate={(band, brief) => { handleSelectBandArchetype(band); setPrompt(brief); setIsHelperOpen(false); }} />
+            <div className="cw cw-actions mb-6"><button onClick={() => setActiveTab('library')}>Your private library ↗</button><button onClick={() => setActiveTab('creative')}>Ask for lyrics, video, or creative help ↗</button><button onClick={() => setActiveTab('listen')}>Explore all genres ↗</button></div>
+            </details>
           </>
         )}
 
@@ -1566,10 +1490,10 @@ const App: React.FC = () => {
         {activeTab === 'stations' && (
           <section className="space-y-10 mb-14">
             <Hero
-              eyebrow="Creator Radio Stations · Top 10 Handoff Destinations"
-              title="Creator Radio Stations & Syndication Hub"
-              subtitle="Curate your own radio station combining band songs (up to 3:50 max), weekly mini-podcasts, and craft commercials. Share under safe studio handles and hand off directly to Spotify, YouTube Music, Amazon Music, and more."
-              ctaLabel="Launch a Station"
+              eyebrow="Local playlist builder"
+              title="Radio station preview"
+              subtitle="Arrange music, podcasts, and commercials into a local station preview. This does not broadcast, publish, or syndicate your audio."
+              ctaLabel="Build a preview"
               ctaHref="#station-builder"
             />
 
@@ -1577,10 +1501,10 @@ const App: React.FC = () => {
               {/* Left 5 Cols: Station Builder */}
               <div className="lg:col-span-5 bg-white rounded-[32px] p-8 card-shadow border border-gray-200/80 space-y-5">
                 <h2 className="text-xl font-bold text-gray-900">
-                  Design & Launch a Radio Station
+                  Build a local station preview
                 </h2>
                 <p className="text-xs text-gray-500 leading-relaxed">
-                  Package your station lineup for listeners here and syndicate your shows to where people already listen.
+                  Try a station lineup in this session. Download your audio and upload it separately to external destinations.
                 </p>
 
                 <div className="space-y-3">
@@ -1678,7 +1602,7 @@ const App: React.FC = () => {
                     disabled={!newStationName.trim()}
                     className="w-full py-3.5 rounded-2xl text-sm font-bold text-white apple-gradient shadow-md disabled:opacity-50"
                   >
-                    Launch Radio Station & Syndicate
+                    Create local station preview
                   </button>
                 </div>
               </div>
@@ -1771,7 +1695,7 @@ const App: React.FC = () => {
                         <span>Format: {st.genreFocus}</span>
                         <span aria-hidden="true">·</span>
                         <span>
-                          Syndicated Ready: {st.syndicatedTo.join(', ')}
+                          Demo destinations (not connected): {st.syndicatedTo.join(', ')}
                         </span>
                         <span aria-hidden="true">·</span>
                         <span>Rotation Queue: {stationTracks.length} items</span>
@@ -1952,13 +1876,13 @@ const App: React.FC = () => {
           <section className="bg-white rounded-[36px] p-8 md:p-10 card-shadow border border-gray-200/80 mb-12 space-y-8">
             <div className="space-y-3">
               <span className="text-xs text-gray-600 font-geist px-4 py-1.5 bg-gradient-to-tr from-zinc-300/10 via-gray-400/10 to-transparent border-[2px] border-gray-300/30 rounded-3xl w-fit tracking-tight uppercase inline-flex items-center">
-                Weekly Cadence · 5 to 10 Minutes Max
+                Create a conversation · 5–10 minute target
               </span>
               <h1
                 className="bg-gradient-to-br from-black from-30% to-black/40 bg-clip-text text-3xl md:text-5xl font-semibold tracking-tighter text-transparent py-1"
                 style={{ textWrap: 'balance' }}
               >
-                Scheduled Mini-Podcast Studio (5 to 10 Minutes Max)
+                Podcast studio
               </h1>
               <p className="text-sm md:text-base text-gray-600 max-w-3xl leading-relaxed tracking-tight">
                 Designed for high-value, consistent weekly episodes between 5 and 10 minutes—never 15 two-minute spam clips a day. Includes dual-host conversational synthesis and 1080p podcast video rendering for Spotify, YouTube, and Amazon Music.
@@ -2066,10 +1990,11 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
+                <details><summary className="cursor-pointer text-sm font-semibold">Optional release plan · notes only, no automatic scheduling</summary>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Weekly Broadcast Day
+                      Planned release day
                     </label>
                     <select
                       value={podcastDay}
@@ -2087,7 +2012,7 @@ const App: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Scheduled Release Slot
+                      Planned release time
                     </label>
                     <select
                       value={podcastTime}
@@ -2103,22 +2028,11 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-white border border-gray-200 cursor-pointer text-xs text-gray-600 leading-relaxed">
-                  <input
-                    type="checkbox"
-                    checked={weeklySchedulePledge}
-                    onChange={(e) => setWeeklySchedulePledge(e.target.checked)}
-                    className="mt-0.5 rounded border-gray-300 text-blue-600"
-                  />
-                  <span>
-                    <strong className="text-gray-900">Weekly Consistency & Anti-Spam Pledge:</strong>{' '}
-                    I commit to releasing my 5–10 minute mini-podcast on a consistent weekly schedule ({podcastDay} at {podcastTime}) and will not spam listeners with multiple short 2-minute clips throughout the day.
-                  </span>
-                </label>
+                </details>
 
                 <button
                   onClick={handleGeneratePodcast}
-                  disabled={isGeneratingPodcast || !weeklySchedulePledge}
+                  disabled={isGeneratingPodcast}
                   className="w-full py-4 rounded-2xl text-sm font-bold text-white apple-gradient shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isGeneratingPodcast ? (
@@ -2127,7 +2041,7 @@ const App: React.FC = () => {
                       <span>Synthesizing Dual-Host Episode & Video Script...</span>
                     </>
                   ) : (
-                    <span>Produce {podcastTargetMinutes}-Min Weekly Mini-Podcast</span>
+                    <span>Produce {podcastTargetMinutes}-Min Podcast</span>
                   )}
                 </button>
               </div>
@@ -2407,7 +2321,7 @@ const App: React.FC = () => {
                 Studio Creations & Kindness Community Feed
               </h2>
               <p className="text-xs text-gray-500">
-                Every creation displays its AI Material or Human Vocalist identifier, adheres to the 3:50 song hard cutoff (jingles/ads separate) or 10m podcast cap, and welcomes positive creator feedback under @handles.
+                Review your audio and lyrics here, then save to My Library or export. Duration labels are targets. Feedback and upload checklists are local session previews.
               </p>
             </div>
             <span className="text-xs font-mono text-gray-500 tabular-nums">
@@ -2433,7 +2347,7 @@ const App: React.FC = () => {
                   {/* Header Row */}
                   <div
                     className={`flex gap-6 items-center ${
-                      isExpanded ? 'flex-col md:flex-row mb-6' : 'flex-row'
+                      isExpanded ? 'flex-col md:flex-row mb-6' : 'flex-col sm:flex-row'
                     }`}
                     onClick={() => !isExpanded && toggleExpand(result.id)}
                     style={{ cursor: isExpanded ? 'default' : 'pointer' }}
@@ -2569,7 +2483,7 @@ const App: React.FC = () => {
 
                       {result.publishedPlatforms.length > 0 && (
                         <div className="mt-1.5 text-xs text-gray-500">
-                          Published & Syndicated to:{' '}
+                          Uploads noted by you (unverified, this session):{' '}
                           <span className="font-semibold text-gray-800">
                             {result.publishedPlatforms.join(' · ')}
                           </span>
@@ -2853,7 +2767,7 @@ const App: React.FC = () => {
                   Handoff "{publishTargetResult.title}" to Your Own Accounts
                 </h3>
                 <p className="text-xs text-gray-500 leading-relaxed">
-                  Tell Them Studio never holds your platform credentials or API keys. Prepare your source files below, then click any of the Top 10 Handoff Links to sign in with your own account and upload as the publisher.
+                  Tell Them Studio never holds your platform credentials or API keys. Download your files, then open a destination and upload there yourself. Opening a link does not upload or publish anything. The optional checklist is your own note, not verified delivery.
                 </p>
               </div>
               <button
@@ -2920,7 +2834,7 @@ const App: React.FC = () => {
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <label className="block text-xs font-bold text-gray-800">
-                  Step 2 — Launch Direct Handoff Link (Top 10 Music & Podcast Destinations)
+                  Step 2 — Download, open a destination, and upload there manually
                 </label>
                 <span className="text-xs text-gray-500">
                   Copies metadata & opens official creator login in a new tab
@@ -2961,9 +2875,7 @@ const App: React.FC = () => {
                           rel="noopener noreferrer"
                           onClick={() => {
                             handleCopyHandoffMetadata(publishTargetResult, plat.name);
-                            if (!isPublished) {
-                              handleSyndicateToggle(publishTargetResult.id, plat.name);
-                            }
+
                           }}
                           className="flex-1 py-2 px-3 rounded-xl bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold text-center transition-colors whitespace-nowrap"
                         >
@@ -2979,7 +2891,7 @@ const App: React.FC = () => {
                               : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                           }`}
                         >
-                          {isPublished ? 'Handed Off ✓' : 'Mark Done'}
+                          {isPublished ? 'Upload noted by you ✓' : 'I uploaded it'}
                         </button>
                       </div>
                     </div>
@@ -3052,10 +2964,10 @@ const App: React.FC = () => {
 
               <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200">
                 <h4 className="font-bold text-sm text-gray-900 mb-1">
-                  3. 3:50 Song Hard Cutoff (Jingles Separate) & Weekly 5–10 Minute Podcast Discipline
+                  3. Duration targets & optional release planning
                 </h4>
                 <p>
-                  Every song can run up to a hard cutoff of <strong>3 minutes and 50 seconds (3:50)</strong>, while jingles and commercial spots use dedicated short formats (<code>:30</code> and <code>:60</code>). Mini-podcasts are strictly <strong>5 to 10 minutes</strong> and require a weekly schedule pledge so creators build loyal audiences without flooding platforms with 15 two-minute clips a day.
+                  Songs, jingles, and podcast lengths are generation targets. Check the finished audio before export. Release plans are notes only; this app does not automatically schedule or distribute episodes.
                 </p>
               </div>
 

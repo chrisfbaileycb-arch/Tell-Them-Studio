@@ -182,7 +182,7 @@ app.post('/api/generate-podcast', async (req, res) => {
     // First generate a rich, structured radio-ready podcast script & show notes
     const scriptPrompt = `You are producing a high-energy, positive, family-safe mini-podcast episode for "${showTitle}".
 Topic: "${episodeTopic}"
-Target Episode Duration: ${targetMinutes} minutes (strictly within the 5 to 10 minute mini-podcast format, scheduled weekly on ${scheduleDay} at ${scheduleTime}).
+Target Episode Duration: ${targetMinutes} minutes (strictly within the 5 to 10 minute mini-podcast format, with optional release-plan notes: ${scheduleDay} at ${scheduleTime}; these notes do not schedule publication).
 Host 1: ${hostAName} (Enthusiastic, warm lead host)
 Host 2: ${hostBName} (Insightful, witty co-host)
 
