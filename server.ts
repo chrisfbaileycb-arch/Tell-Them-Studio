@@ -141,24 +141,34 @@ app.post('/api/creative-assistant', async (req, res) => {
 
 // 1. Generate Song Title
 app.post('/api/generate-title', async (req, res) => {
+  const { musicPrompt = '', lyricContext = '' } = req.body || {};
   try {
-    const { musicPrompt, lyricContext } = req.body;
     const ai = getAiClient();
     const prompt = `Based on this music prompt: "${musicPrompt}" and these lyrics: "${(lyricContext || '').substring(0, 500)}", generate a catchy, evocative, short song title (3 words max). Return ONLY the title string, no quotes or extra text.`;
     const response = await generateTextWithFallback(ai, prompt);
-    res.json({ title: response.text?.trim() || 'Untitled Studio Track' });
+    const cleaned = response.text?.trim().replace(/^["']|["']$/g, '');
+    if (cleaned) {
+      return res.json({ title: cleaned });
+    }
   } catch (error: any) {
     console.warn('Using fallback song title:', error?.message || error);
-    res.json({ title: 'Studio Session Track' });
   }
+  const stopWords = new Set(['create', 'make', 'song', 'track', 'music', 'with', 'about', 'that', 'this', 'from', 'the', 'and', 'for', 'our', 'your', 'original', 'upbeat', 'short', 'clip']);
+  const words = `${musicPrompt} ${lyricContext}`
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !stopWords.has(w.toLowerCase()))
+    .slice(0, 3)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  res.json({ title: words.length > 0 ? words.join(' ') : 'Studio Session Track' });
 });
 
 // 2. Generate Cover Art
 app.post('/api/generate-cover', async (req, res) => {
   try {
-    const { musicPrompt, lyricContext, title } = req.body;
+    const { musicPrompt, lyricContext, title, genre } = req.body || {};
     const ai = getAiClient();
-    const imagePrompt = `A high-quality, professional square album cover for a radio-ready track titled "${title || 'Studio Session'}". Atmosphere: ${musicPrompt}. Context: ${(lyricContext || '').substring(0, 200)}. Editorial studio photography and graphic art aesthetic. IMPORTANT: Ignore any mention of BPM or musical scale in the prompt; do NOT print any numbers, BPM, or scale text on the image.`;
+    const imagePrompt = `A high-quality, professional square album cover picture that coincides directly with the song titled "${title || 'Studio Session'}" (${genre || 'Original Music'}). Visual story & atmosphere from the song: ${musicPrompt}. Lyric imagery: ${(lyricContext || '').substring(0, 240)}. Editorial studio photography and graphic art aesthetic. IMPORTANT: Ignore any mention of BPM or musical scale in the prompt; do NOT print any numbers, BPM, or scale text on the image.`;
     const response = await ai.models.generateContent({
       model: process.env.COVER_MODEL || 'gemini-3.1-flash-lite-image',
       contents: { parts: [{ text: imagePrompt }] },

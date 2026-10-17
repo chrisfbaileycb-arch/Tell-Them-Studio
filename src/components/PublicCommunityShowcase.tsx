@@ -16,7 +16,11 @@ import {
   X,
 } from 'lucide-react';
 import { CommunityFeedItem } from '../../types';
-import { createStudioCoverSvg } from '../../constants';
+import {
+  createStudioCoverSvg,
+  createUniqueSongArtworkSvg,
+  describeSongPictureTheme,
+} from '../../constants';
 import { cleanLyricsForDisplay } from '../utils/lyricsUtils';
 
 const MUSIC_GENRE_FILTERS = [
@@ -237,69 +241,96 @@ export const PublicCommunityShowcase: React.FC<PublicCommunityShowcaseProps> = (
                 const isThisActive = activeTrack?.id === track.id;
                 const isThisPlaying = isThisActive && isPlaying;
                 const showLyrics = expandedLyricsId === track.id;
+                const trackPictureUrl =
+                  track.coverImageUrl ||
+                  createUniqueSongArtworkSvg({
+                    title: track.title,
+                    genre: track.genre,
+                    lyrics: track.lyrics,
+                    creatorHandle: track.creatorHandle,
+                    seed: track.id,
+                    motif: 'band',
+                  });
+                const pictureTheme = describeSongPictureTheme({
+                  title: track.title,
+                  genre: track.genre,
+                  lyrics: track.lyrics,
+                  creatorHandle: track.creatorHandle,
+                  seed: track.id,
+                  motif: 'band',
+                }).trim();
 
                 return (
                   <article
                     key={track.id}
                     data-testid={`community-music-card-${track.id}`}
-                    className={`rounded-2xl border p-5 flex flex-col justify-between gap-4 transition-all ${
+                    className={`rounded-2xl border overflow-hidden flex flex-col justify-between transition-all ${
                       isThisActive
                         ? 'border-purple-500 bg-gray-50/90 shadow-md'
                         : 'border-gray-200/80 bg-gray-50/50 hover:border-gray-300'
                     }`}
                   >
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-4">
+                    <div>
+                      <div className="relative h-48 w-full overflow-hidden border-b border-gray-200/70 bg-gray-900">
                         <img
-                          src={
-                            track.coverImageUrl ||
-                            createStudioCoverSvg('#1e1b4b', '#7f1d1d', '#f59e0b', 'band')
-                          }
-                          alt={track.title}
-                          className="w-16 h-16 rounded-xl object-cover border border-gray-200 shrink-0"
+                          data-testid="community-post-picture"
+                          src={trackPictureUrl}
+                          alt={`Song post picture coinciding with ${track.title}: ${pictureTheme}`}
+                          className="w-full h-full object-cover"
                         />
-                        <div className="min-w-0 flex-1 space-y-1">
+                        <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-gray-950/75 backdrop-blur-sm text-[11px] text-white">
+                          <span className="font-semibold text-amber-300 truncate">
+                            Picture: {pictureTheme}
+                          </span>
+                          <span className="font-mono text-gray-300 shrink-0">
+                            {track.durationLabel || '3:42'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-5 space-y-3">
+                        <div className="min-w-0 space-y-1">
                           <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
                             <span className="font-semibold text-blue-600 font-mono">
                               {track.creatorHandle}
                             </span>
                             <span aria-hidden="true">·</span>
                             <span className="font-semibold text-gray-800">{track.genre}</span>
+                            <span aria-hidden="true">·</span>
+                            <span className="text-[11px] text-gray-500 font-mono tabular-nums">
+                              {new Date(track.createdAt).toLocaleDateString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </span>
                           </div>
                           <h3 className="text-base font-bold text-gray-900 leading-snug break-words">
                             {track.title}
                           </h3>
-                          <div className="text-[11px] text-gray-500 font-mono tabular-nums">
-                            {track.durationLabel || '3:42'} ·{' '}
-                            {new Date(track.createdAt).toLocaleDateString(undefined, {
-                              month: 'short',
-                              day: 'numeric',
-                            })}
-                          </div>
                         </div>
-                      </div>
 
-                      {track.lyrics && (
-                        <div className="text-xs text-gray-600">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setExpandedLyricsId(showLyrics ? null : track.id)
-                            }
-                            className="text-blue-600 font-semibold hover:underline"
-                          >
-                            {showLyrics ? 'Hide lyrics' : 'View lyrics'}
-                          </button>
-                          {showLyrics && (
-                            <pre className="mt-2 p-3 rounded-xl bg-white border border-gray-200 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-36 overflow-y-auto">
-                              {cleanLyricsForDisplay(track.lyrics)}
-                            </pre>
-                          )}
-                        </div>
-                      )}
+                        {track.lyrics && (
+                          <div className="text-xs text-gray-600">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedLyricsId(showLyrics ? null : track.id)
+                              }
+                              className="text-blue-600 font-semibold hover:underline"
+                            >
+                              {showLyrics ? 'Hide lyrics' : 'View lyrics'}
+                            </button>
+                            {showLyrics && (
+                              <pre className="mt-2 p-3 rounded-xl bg-white border border-gray-200 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-36 overflow-y-auto">
+                                {cleanLyricsForDisplay(track.lyrics)}
+                              </pre>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 pt-3 border-t border-gray-200/60">
+                    <div className="px-5 pb-5 flex items-center justify-between gap-3 pt-3 border-t border-gray-200/60">
                       <span className="text-xs text-gray-500 truncate">
                         {track.vocalArrangement || 'Studio Vocal Arrangement'}
                       </span>
@@ -358,6 +389,16 @@ export const PublicCommunityShowcase: React.FC<PublicCommunityShowcaseProps> = (
                 const effectivePosition = isThisActive
                   ? currentTime
                   : localScrubById[ep.id] || 0;
+                const epPictureUrl =
+                  ep.coverImageUrl ||
+                  createUniqueSongArtworkSvg({
+                    title: ep.title,
+                    genre: 'Podcast',
+                    lyrics: ep.lyrics,
+                    creatorHandle: ep.creatorHandle,
+                    seed: ep.id,
+                    motif: 'podcast',
+                  });
 
                 return (
                   <article
@@ -372,12 +413,10 @@ export const PublicCommunityShowcase: React.FC<PublicCommunityShowcaseProps> = (
                     <div className="space-y-3">
                       <div className="flex items-start gap-4">
                         <img
-                          src={
-                            ep.coverImageUrl ||
-                            createStudioCoverSvg('#0f172a', '#1e3a8a', '#38bdf8', 'podcast')
-                          }
+                          data-testid="community-post-picture"
+                          src={epPictureUrl}
                           alt={ep.title}
-                          className="w-16 h-16 rounded-xl object-cover border border-gray-200 shrink-0"
+                          className="w-20 h-20 rounded-xl object-cover border border-gray-200 shrink-0"
                         />
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
@@ -485,6 +524,12 @@ interface PersistentCommunityPlayerProps {
 }
 
 const VISUALIZER_BAR_COUNT = 28;
+const PLAYBACK_SPEEDS = [
+  { value: 0.5, label: '0.5x' },
+  { value: 1.0, label: '1.0x' },
+  { value: 1.5, label: '1.5x' },
+  { value: 2.0, label: '2.0x' },
+] as const;
 
 export const PersistentCommunityPlayer: React.FC<PersistentCommunityPlayerProps> = ({
   track,
@@ -500,12 +545,27 @@ export const PersistentCommunityPlayer: React.FC<PersistentCommunityPlayerProps>
   onPlayStateChange,
 }) => {
   const [muted, setMuted] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const envelopeRef = React.useRef<number[]>([]);
   const phaseRef = React.useRef<number>(0);
   const currentLevelsRef = React.useRef<number[]>(
     Array.from({ length: VISUALIZER_BAR_COUNT }, () => 0.16)
   );
+
+  // Sync playbackRate with the underlying <audio> element whenever speed or track changes
+  React.useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackSpeed;
+    }
+  }, [playbackSpeed, track?.audioUrl, audioRef]);
+
+  const handleSelectSpeed = (speed: number) => {
+    setPlaybackSpeed(speed);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = speed;
+    }
+  };
 
   // Decode real audio amplitude envelope from track.audioUrl without hijacking the <audio> element
   React.useEffect(() => {
@@ -600,7 +660,7 @@ export const PersistentCommunityPlayer: React.FC<PersistentCommunityPlayerProps>
         const baseEnergy = envIndex >= 0 ? env[envIndex] : 0.65;
 
         if (isPlaying && !muted && !reducedMotion) {
-          phaseRef.current += 0.16;
+          phaseRef.current += 0.16 * playbackSpeed;
         }
 
         const gradient = ctx.createLinearGradient(0, height, 0, 0);
@@ -672,7 +732,7 @@ export const PersistentCommunityPlayer: React.FC<PersistentCommunityPlayerProps>
     return () => {
       if (rafId) window.cancelAnimationFrame(rafId);
     };
-  }, [isPlaying, muted, currentTime, duration, track]);
+  }, [isPlaying, muted, currentTime, duration, track, playbackSpeed]);
 
   if (!track) return null;
 
@@ -688,9 +748,13 @@ export const PersistentCommunityPlayer: React.FC<PersistentCommunityPlayerProps>
         muted={muted}
         preload="metadata"
         onTimeUpdate={(e) => onTimeUpdate(e.currentTarget.currentTime)}
-        onLoadedMetadata={(e) => onDurationChange(e.currentTarget.duration)}
+        onLoadedMetadata={(e) => {
+          e.currentTarget.playbackRate = playbackSpeed;
+          onDurationChange(e.currentTarget.duration);
+        }}
         onDurationChange={(e) => onDurationChange(e.currentTarget.duration)}
         onPlay={(e) => {
+          e.currentTarget.playbackRate = playbackSpeed;
           onPlayStateChange(true);
           document.querySelectorAll('audio').forEach((a) => {
             if (a !== e.currentTarget) a.pause();
@@ -776,8 +840,34 @@ export const PersistentCommunityPlayer: React.FC<PersistentCommunityPlayerProps>
           </span>
         </div>
 
-        {/* Volume & Dismiss */}
+        {/* Playback Speed Controls, Volume & Dismiss */}
         <div className="flex items-center gap-2 shrink-0">
+          <div
+            role="group"
+            aria-label="Playback speed"
+            data-testid="playback-speed-controls"
+            className="inline-flex items-center gap-0.5 p-1 rounded-xl bg-gray-100 border border-gray-200/80"
+          >
+            {PLAYBACK_SPEEDS.map((s) => {
+              const active = playbackSpeed === s.value;
+              return (
+                <button
+                  key={s.label}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => handleSelectSpeed(s.value)}
+                  className={`px-2 py-1 rounded-lg text-xs font-mono tabular-nums font-semibold transition-colors ${
+                    active
+                      ? 'bg-gray-900 text-white shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+
           <button
             type="button"
             aria-label={muted ? 'Unmute player' : 'Mute player'}

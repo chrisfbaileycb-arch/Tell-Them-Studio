@@ -2,7 +2,7 @@ import { StudioPlayer } from './StudioPlayer';
 import React, { useRef, useState } from 'react';
 import { ArrowRight, AudioLines, ChevronDown, Download, Guitar, Headphones, Mic, Music2, Plus, Radio, Share2, Sparkles, Users, X } from 'lucide-react';
 import type { BandArchetype, Duration, LyricsOption, SongResult, VocalArrangement } from '../../types';
-import { BAND_ARCHETYPES, VOCAL_ARRANGEMENTS } from '../../constants';
+import { BAND_ARCHETYPES, VOCAL_ARRANGEMENTS, createUniqueSongArtworkSvg, describeSongPictureTheme } from '../../constants';
 
 type ImageReference = { data: string; mimeType: string; previewUrl: string };
 type Props = {
@@ -54,6 +54,29 @@ export function MusicStudio(p: Props) {
   const selectedVocal = instrumental ? 'Instrumental' : p.vocals.includes('3-Part') || p.vocals.includes('Harmony') || p.vocals.includes('Dual') ? 'Harmonies' : p.vocals.includes('Trade-Off') ? 'Duet' : 'Solo';
   const isRock = p.genre === 'Rock Band' || p.genre === 'Hair Metal Band';
   const isDemo = p.featured?.id.startsWith('seed-');
+  const featuredGenre = p.featured ? (p.featured.bandType === 'Custom Genre' && p.featured.customGenreName ? p.featured.customGenreName : p.featured.bandType) : '';
+  const featuredPictureUrl = p.featured && !isDemo
+    ? (p.featured.coverImageUrl || createUniqueSongArtworkSvg({
+        title: p.featured.title,
+        genre: featuredGenre,
+        prompt: p.featured.originalPrompt || p.featured.fullPrompt || '',
+        lyrics: p.featured.lyrics,
+        creatorHandle: p.featured.creatorHandle,
+        seed: p.featured.id,
+        motif: 'band',
+      }))
+    : '/images/electric-afterglow.webp';
+  const featuredPictureTheme = p.featured && !isDemo
+    ? describeSongPictureTheme({
+        title: p.featured.title,
+        genre: featuredGenre,
+        prompt: p.featured.originalPrompt || p.featured.fullPrompt || '',
+        lyrics: p.featured.lyrics,
+        creatorHandle: p.featured.creatorHandle,
+        seed: p.featured.id,
+        motif: 'band',
+      }).trim()
+    : '';
   return <div className="music-workbench">
     <section className="music-compose" aria-labelledby="music-title">
       <div className="studio-eyebrow">CREATE</div>
@@ -108,10 +131,14 @@ export function MusicStudio(p: Props) {
       {!p.confirmed && <p role="status" className="studio-help">Confirm your reference permissions in Fine-tune your sound to continue.</p>}
     </section>
     <aside className="studio-featured" aria-label="Featured studio track">
-      <div className="studio-eyebrow">{p.featured && !isDemo ? 'YOUR LATEST CREATION' : 'STUDIO INSPIRATION'}</div>
-      <img className="studio-cover" src={p.featured?.coverImageUrl && !isDemo ? p.featured.coverImageUrl : '/images/electric-afterglow.webp'} alt={isDemo || !p.featured ? 'Electric guitar under violet and magenta stage lights' : `Cover art for ${p.featured.title || 'your creation'}`} />
+      <div className="studio-eyebrow">{p.featured && !isDemo ? 'YOUR LATEST SONG POST' : 'STUDIO INSPIRATION'}</div>
+      <img className="studio-cover" data-testid="featured-song-picture" src={featuredPictureUrl} alt={isDemo || !p.featured ? 'Electric guitar under violet and magenta stage lights' : `Cover art coinciding with ${p.featured.title || 'your creation'}: ${featuredPictureTheme}`} />
       <h2>{p.featured?.title || 'Your next sound starts here.'}</h2>
-      <p className="studio-track-meta">{p.featured ? `${p.featured.bandType}${isDemo ? ' · Synthesized instrumental preview' : ''}` : 'Rock, soul, electronic, or something entirely yours.'}</p>
+      <p className="studio-track-meta">
+        {p.featured
+          ? `${featuredGenre}${isDemo ? ' · Synthesized instrumental preview' : featuredPictureTheme ? ` · Picture: ${featuredPictureTheme}` : ''}`
+          : 'Rock, soul, electronic, or something entirely yours.'}
+      </p>
       {p.featured?.audioUrl && <StudioPlayer src={p.featured.audioUrl} title={p.featured.title || 'Studio track'} />}
       {p.featured && !isDemo && p.featured.audioUrl && (
         <div className="studio-featured-actions">

@@ -7,7 +7,11 @@ import React, {
   useState,
 } from "react";
 import { BandArchetype, SongResult } from "../../types";
-import { createStudioCoverSvg } from "../../constants";
+import {
+  createStudioCoverSvg,
+  createUniqueSongArtworkSvg,
+  describeSongPictureTheme,
+} from "../../constants";
 import {
   GENRES,
   SampleGenre,
@@ -111,6 +115,13 @@ const makeTrack = (
   createdAt: new Date().toISOString(),
   visibility: "private",
   remixAllowed: false,
+  coverImageUrl: createUniqueSongArtworkSvg({
+    title,
+    genre,
+    creatorHandle: owner,
+    seed: `${title}-${genre}-${owner}`,
+    motif: "band",
+  }),
 });
 
 export function SaveCreations({
@@ -147,10 +158,11 @@ export function SaveCreations({
             try {
               const response = await fetch(result.audioUrl!);
               if (!response.ok) throw new Error("Could not read this audio.");
+              const trackGenre = result.customGenreName || result.bandType;
               await put({
                 ...makeTrack(
                   result.title || "Studio creation",
-                  result.customGenreName || result.bandType,
+                  trackGenre,
                   await response.blob(),
                   "generated",
                   owner,
@@ -163,6 +175,22 @@ export function SaveCreations({
                       ? "commercial"
                       : "music",
                 lyrics: result.lyrics,
+                coverImageUrl:
+                  result.coverImageUrl ||
+                  createUniqueSongArtworkSvg({
+                    title: result.title || "Studio creation",
+                    genre: trackGenre,
+                    prompt: result.originalPrompt || result.fullPrompt || "",
+                    lyrics: result.lyrics,
+                    creatorHandle: owner,
+                    seed: result.id,
+                    motif:
+                      result.itemType === "podcast"
+                        ? "podcast"
+                        : result.itemType === "commercial"
+                          ? "commercial"
+                          : "band",
+                  }),
               });
               setNotice("Saved privately to My Library.");
             } catch (e) {
@@ -744,10 +772,41 @@ export function CreativeWorkspace({
             </div>
           )}
           <div className="cw-grid">
-            {visible.map((t) => (
+            {visible.map((t) => {
+              const trackMotif =
+                t.kind === "podcast"
+                  ? "podcast"
+                  : t.kind === "commercial"
+                    ? "commercial"
+                    : "band";
+              const trackPictureUrl =
+                t.coverImageUrl ||
+                createUniqueSongArtworkSvg({
+                  title: t.title,
+                  genre: t.genre,
+                  lyrics: t.lyrics,
+                  creatorHandle: t.owner,
+                  seed: t.id,
+                  motif: trackMotif,
+                });
+              const trackPictureTheme = describeSongPictureTheme({
+                title: t.title,
+                genre: t.genre,
+                lyrics: t.lyrics,
+                creatorHandle: t.owner,
+                seed: t.id,
+                motif: trackMotif,
+              }).trim();
+              return (
               <article className="cw-track" key={t.id}>
+                <img
+                  data-testid="library-track-picture"
+                  src={trackPictureUrl}
+                  alt={`Picture coinciding with ${t.title}: ${trackPictureTheme}`}
+                  className="w-full h-44 rounded-2xl object-cover border border-gray-200 mb-3"
+                />
                 <small>
-                  {t.genre} · {t.kind} · {t.source}
+                  {t.genre} · {t.kind} · {t.source} · Picture: {trackPictureTheme}
                 </small>
                 <h3>{t.title}</h3>
                 <p>
@@ -915,7 +974,8 @@ export function CreativeWorkspace({
                   </>
                 )}
               </article>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}

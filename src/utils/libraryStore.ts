@@ -10,6 +10,7 @@ export interface LibraryTrack {
   source: "sample" | "upload" | "generated" | "mix";
   lyrics: string;
   owner: string;
+  coverImageUrl?: string;
 }
 const open = (): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {

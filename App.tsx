@@ -28,6 +28,8 @@ import {
   TOP_HANDOFF_PLATFORMS,
   VOCAL_ARRANGEMENTS,
   createStudioCoverSvg,
+  createUniqueSongArtworkSvg,
+  describeSongPictureTheme,
 } from './constants';
 import { CONFIG } from './src/config';
 import {
@@ -443,13 +445,26 @@ const App: React.FC = () => {
       ? '2-minute 48-second radio single (within the 3:50 song cutoff)'
       : 'full-length radio song up to the 3 minutes and 50 seconds (3:50) hard cutoff';
 
+    const genreDescription =
+      activeBand === 'Custom Genre' ? customGenreName || 'Custom Genre' : activeBand;
+
+    const initialCoverUrl = createUniqueSongArtworkSvg({
+      title: activePrompt.slice(0, 28) || 'Original Studio Track',
+      genre: genreDescription,
+      prompt: activePrompt,
+      lyrics: activeCustomLyrics,
+      creatorHandle,
+      seed: newId,
+      motif: 'band',
+    });
+
     const newResult: SongResult = {
       id: newId,
       itemType: 'song',
       status: 'generating',
       logs: [],
       audioUrl: null,
-      coverImageUrl: createStudioCoverSvg('#1e1b4b', '#9d174d', '#f59e0b', 'band'),
+      coverImageUrl: initialCoverUrl,
       title: null,
       creatorHandle,
       bandType: activeBand,
@@ -483,9 +498,6 @@ const App: React.FC = () => {
     setGen((prev) => ({
       results: [newResult, ...prev.results.map((r) => ({ ...r, isExpanded: false }))],
     }));
-
-    const genreDescription =
-      activeBand === 'Custom Genre' ? customGenreName : activeBand;
 
     addLog(
       newId,
@@ -526,10 +538,27 @@ const App: React.FC = () => {
       addLog(newId, isClip ? 'Jingle / hook stream captured.' : 'Audio received. Duration is a generation target; review the actual playback length before export.');
 
       const title = await generateSongTitle(activePrompt, lyrics || activePrompt);
-      updateResult(newId, (r) => ({ ...r, title }));
+      const syncedVectorCover = createUniqueSongArtworkSvg({
+        title,
+        genre: genreDescription,
+        prompt: activePrompt,
+        lyrics: lyrics || activePrompt,
+        creatorHandle,
+        seed: newId,
+        motif: 'band',
+      });
+      updateResult(newId, (r) => ({ ...r, title, coverImageUrl: syncedVectorCover }));
       addLog(newId, `Track titled: "${title}"`);
 
-      const coverImageUrl = await generateCoverArt(activePrompt, lyrics || activePrompt, title, 'band');
+      const coverImageUrl = await generateCoverArt(
+        activePrompt,
+        lyrics || activePrompt,
+        title,
+        'band',
+        genreDescription,
+        creatorHandle,
+        newId
+      );
       updateResult(newId, (r) => ({ ...r, coverImageUrl }));
     } catch (err: any) {
       updateResult(newId, (r) => ({
@@ -625,7 +654,10 @@ const App: React.FC = () => {
         podcastShowTitle,
         podcastTopic,
         data.episodeTitle,
-        'podcast'
+        'podcast',
+        'Podcast',
+        creatorHandle,
+        newId
       );
 
       updateResult(newId, (r) => ({
@@ -720,7 +752,10 @@ const App: React.FC = () => {
         adBrandName,
         adOffering,
         data.campaignTitle,
-        'commercial'
+        'commercial',
+        'Broadcast Commercial',
+        creatorHandle,
+        newId
       );
 
       updateResult(newId, (r) => ({
@@ -2034,10 +2069,41 @@ const App: React.FC = () => {
             const isGenerating = result.status === 'generating';
             const isFailed = result.status === 'error';
             const isRecordingThis = recordingForId === result.id;
+            const postGenre =
+              result.bandType === 'Custom Genre' && result.customGenreName
+                ? result.customGenreName
+                : result.bandType;
+            const postMotif =
+              result.itemType === 'podcast'
+                ? 'podcast'
+                : result.itemType === 'commercial'
+                ? 'commercial'
+                : 'band';
+            const postPictureUrl =
+              result.coverImageUrl ||
+              createUniqueSongArtworkSvg({
+                title: result.title || 'Original Studio Track',
+                genre: postGenre,
+                prompt: result.originalPrompt || result.fullPrompt || '',
+                lyrics: result.lyrics,
+                creatorHandle: result.creatorHandle,
+                seed: result.id,
+                motif: postMotif,
+              });
+            const pictureThemeLabel = describeSongPictureTheme({
+              title: result.title,
+              genre: postGenre,
+              prompt: result.originalPrompt || result.fullPrompt || '',
+              lyrics: result.lyrics,
+              creatorHandle: result.creatorHandle,
+              seed: result.id,
+              motif: postMotif,
+            }).trim();
 
             return (
               <div
                 key={result.id}
+                data-testid={`studio-song-post-${result.id}`}
                 className="group relative transition-all duration-300 bg-white border border-gray-200/80 card-shadow rounded-[36px] overflow-hidden"
               >
                 <div className={isExpanded ? 'p-8' : 'p-5'}>
@@ -2052,15 +2118,13 @@ const App: React.FC = () => {
                     {/* Cover Art + Play Trigger */}
                     <div
                       className={`relative shrink-0 rounded-3xl overflow-hidden shadow-md border border-gray-200 ${
-                        isExpanded ? 'w-44 h-44 md:w-48 md:h-48' : 'w-16 h-16'
+                        isExpanded ? 'w-44 h-44 md:w-52 md:h-52' : 'w-20 h-20'
                       }`}
                     >
                       <img
-                        src={
-                          result.coverImageUrl ||
-                          createStudioCoverSvg('#1e1b4b', '#7f1d1d', '#f59e0b', 'band')
-                        }
-                        alt={result.title || 'Studio Cover'}
+                        data-testid="song-post-picture"
+                        src={postPictureUrl}
+                        alt={`Picture coinciding with ${result.title || 'Studio Song'}: ${pictureThemeLabel}`}
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover"
                       />
@@ -2108,15 +2172,20 @@ const App: React.FC = () => {
                         </span>
                         <span aria-hidden="true">·</span>
                         <span className="font-semibold text-gray-800">
-                          {result.bandType === 'Custom Genre' && result.customGenreName
-                            ? result.customGenreName
-                            : result.bandType}
+                          {postGenre}
                         </span>
                         <span aria-hidden="true">·</span>
                         <span>{result.vocalArrangement}</span>
                         <span aria-hidden="true">·</span>
                         <span className="font-mono tabular-nums font-semibold text-gray-900">
                           {result.maxCapLabel}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span
+                          data-testid="song-post-picture-theme"
+                          className="font-semibold text-purple-700"
+                        >
+                          Post Picture: {pictureThemeLabel}
                         </span>
                         <span aria-hidden="true">·</span>
                         <span className="font-semibold text-emerald-700">

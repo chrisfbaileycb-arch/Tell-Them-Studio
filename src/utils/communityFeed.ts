@@ -1,5 +1,5 @@
 import { CommunityFeedItem, SongResult } from '../../types';
-import { createStudioCoverSvg } from '../../constants';
+import { createUniqueSongArtworkSvg } from '../../constants';
 import { createStudioPreviewWavUrl } from './audioUtils';
 
 export const COMMUNITY_FEED_STORAGE_KEY = 'tell-them-community-feed';
@@ -83,7 +83,14 @@ export function getSeedCommunityFeed(): CommunityFeedItem[] {
       createdAt: new Date(Date.now() - 3600 * 1000 * 5).toISOString(),
       durationLabel: '3:42',
       vocalArrangement: 'Multi-Singer Trade-Off (Male & Female)',
-      coverImageUrl: createStudioCoverSvg('#1e1b4b', '#7f1d1d', '#f59e0b', 'band'),
+      coverImageUrl: createUniqueSongArtworkSvg({
+        title: 'Steel City Gold & Black',
+        genre: 'Rock Band',
+        prompt: 'Friday river bridges and stadium gold & black lights',
+        lyrics: 'Under the Friday river lights, hear the bridges hum',
+        creatorHandle: '@riverfront_rockers',
+        seed: 'seed-band-1',
+      }),
     },
     {
       id: 'seed-hair-metal-1',
@@ -96,7 +103,14 @@ export function getSeedCommunityFeed(): CommunityFeedItem[] {
       createdAt: new Date(Date.now() - 3600 * 1000 * 8).toISOString(),
       durationLabel: '3:35',
       vocalArrangement: 'Dual Male Lead & Harmony',
-      coverImageUrl: createStudioCoverSvg('#3b0764', '#be185d', '#f59e0b', 'band'),
+      coverImageUrl: createUniqueSongArtworkSvg({
+        title: 'Sunset Strip Arena Nights',
+        genre: 'Hair Metal Band',
+        prompt: '80s Sunset Strip arena lasers and twin-guitar shred',
+        lyrics: 'Spotlights cutting through the velvet haze, pyrotechnic thunder',
+        creatorHandle: '@glam_shred_88',
+        seed: 'seed-hair-metal-1',
+      }),
     },
     {
       id: 'seed-band-2',
@@ -109,7 +123,14 @@ export function getSeedCommunityFeed(): CommunityFeedItem[] {
       createdAt: new Date(Date.now() - 3600 * 1000 * 12).toISOString(),
       durationLabel: '3:38',
       vocalArrangement: '3-Part Band Harmonies',
-      coverImageUrl: createStudioCoverSvg('#3b0764', '#9d174d', '#38bdf8', 'band'),
+      coverImageUrl: createUniqueSongArtworkSvg({
+        title: 'Starlight Roller Boogie',
+        genre: 'Disco Band',
+        prompt: 'Crystal mirrorball spinning over a retro roller rink',
+        lyrics: 'Lace up the skates, let the mirrorball spin',
+        creatorHandle: '@velvet_groove_fm',
+        seed: 'seed-band-2',
+      }),
     },
     {
       id: 'seed-pod-1',
@@ -122,7 +143,14 @@ export function getSeedCommunityFeed(): CommunityFeedItem[] {
       createdAt: new Date(Date.now() - 3600 * 1000 * 6).toISOString(),
       narratorInfo: 'Narrators: Alex (Puck) & Sam (Kore)',
       durationLabel: '7:00',
-      coverImageUrl: createStudioCoverSvg('#0f172a', '#1e3a8a', '#38bdf8', 'podcast'),
+      coverImageUrl: createUniqueSongArtworkSvg({
+        title: 'Backstage Band & Radio Weekly',
+        genre: 'Podcast',
+        prompt: 'Dual-host podcast studio broadcast booth',
+        creatorHandle: '@studio_voyager',
+        seed: 'seed-pod-1',
+        motif: 'podcast',
+      }),
     },
     {
       id: 'seed-pod-2',
@@ -135,7 +163,14 @@ export function getSeedCommunityFeed(): CommunityFeedItem[] {
       createdAt: new Date(Date.now() - 3600 * 1000 * 18).toISOString(),
       narratorInfo: 'Narrators: Jordan (Fenrir) & Riley (Zephyr)',
       durationLabel: '6:00',
-      coverImageUrl: createStudioCoverSvg('#1e1b4b', '#312e81', '#a855f7', 'podcast'),
+      coverImageUrl: createUniqueSongArtworkSvg({
+        title: 'Studio Soundcheck: Songwriting',
+        genre: 'Podcast',
+        prompt: 'Songwriting notebook and studio microphones',
+        creatorHandle: '@melody_maker_88',
+        seed: 'seed-pod-2',
+        motif: 'podcast',
+      }),
     },
   ];
 }
@@ -153,19 +188,37 @@ export function loadCommunityFeedSync(): CommunityFeedItem[] {
       localStorage.setItem(COMMUNITY_FEED_STORAGE_KEY, JSON.stringify(seeds));
       return seeds;
     }
-    // Filter out any commercials and refresh expired blob: URLs on seeded items
+    // Filter out any commercials, refresh expired blob: URLs, and ensure every item has a unique song-matched picture
     const rockWav = createStudioPreviewWavUrl('rock');
     const discoWav = createStudioPreviewWavUrl('disco');
     return parsed
       .filter((item: any) => item && (item.type === 'music' || item.type === 'podcast'))
       .map((item: CommunityFeedItem) => {
+        const needsUniqueCover =
+          !item.coverImageUrl ||
+          (item.coverImageUrl.startsWith('data:image/svg+xml') && !item.coverImageUrl.includes('bgGrad'));
+        const updatedCover = needsUniqueCover
+          ? createUniqueSongArtworkSvg({
+              title: item.title,
+              genre: item.genre,
+              lyrics: item.lyrics,
+              creatorHandle: item.creatorHandle,
+              seed: item.id,
+              motif: item.type === 'podcast' ? 'podcast' : 'band',
+            })
+          : item.coverImageUrl;
+
         if (!item.audioUrl || (item.id.startsWith('seed-') && item.audioUrl.startsWith('blob:'))) {
           return {
             ...item,
+            coverImageUrl: updatedCover,
             audioUrl: item.id.includes('2') || item.id === 'seed-pod-1' ? discoWav : rockWav,
           };
         }
-        return item;
+        return {
+          ...item,
+          coverImageUrl: updatedCover,
+        };
       });
   } catch {
     return seeds;
@@ -249,9 +302,14 @@ export async function createCommunityFeedItemFromResult(
           : 'Narrators: Studio Co-Hosts')
       : undefined;
 
+  const title = result.title || (type === 'podcast' ? 'Untitled Podcast Episode' : 'Untitled Studio Track');
+  const hasBespokeCover =
+    result.coverImageUrl &&
+    (!result.coverImageUrl.startsWith('data:image/svg+xml') || result.coverImageUrl.includes('bgGrad'));
+
   return {
     id: result.id,
-    title: result.title || (type === 'podcast' ? 'Untitled Podcast Episode' : 'Untitled Studio Track'),
+    title,
     creatorHandle: result.creatorHandle,
     genre,
     audioUrl: persistedAudioUrl,
@@ -263,14 +321,17 @@ export async function createCommunityFeedItemFromResult(
         : new Date().toISOString(),
     narratorInfo,
     durationLabel,
-    coverImageUrl:
-      result.coverImageUrl ||
-      createStudioCoverSvg(
-        type === 'podcast' ? '#0f172a' : '#1e1b4b',
-        type === 'podcast' ? '#1e3a8a' : '#7f1d1d',
-        type === 'podcast' ? '#38bdf8' : '#f59e0b',
-        type === 'podcast' ? 'podcast' : 'band'
-      ),
+    coverImageUrl: hasBespokeCover
+      ? result.coverImageUrl!
+      : createUniqueSongArtworkSvg({
+          title,
+          genre,
+          prompt: result.originalPrompt || result.fullPrompt || '',
+          lyrics: result.lyrics || '',
+          creatorHandle: result.creatorHandle,
+          seed: result.id,
+          motif: type === 'podcast' ? 'podcast' : 'band',
+        }),
     vocalArrangement: result.vocalArrangement,
   };
 }

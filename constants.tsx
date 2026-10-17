@@ -12,6 +12,265 @@ import {
   VocalArrangement,
 } from './types';
 
+export interface SongArtworkOptions {
+  title?: string | null;
+  genre?: string;
+  prompt?: string;
+  lyrics?: string;
+  creatorHandle?: string;
+  seed?: string | number;
+  motif?: 'band' | 'podcast' | 'commercial' | 'halloween' | 'christmas' | 'radio';
+}
+
+function hashSongString(input: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h >>> 0);
+}
+
+function escapeSvgText(text: string): string {
+  return (text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function describeSongPictureTheme(opts: SongArtworkOptions): string {
+  const combined = `${opts.title || ''} ${opts.genre || ''} ${opts.prompt || ''} ${opts.lyrics || ''}`.toLowerCase();
+  if (opts.motif === 'halloween' || combined.includes('halloween') || combined.includes('pumpkin') || combined.includes('ghost')) {
+    return ' Jack-o’-Lantern Moon & October Surf Stage';
+  }
+  if (opts.motif === 'christmas' || combined.includes('christmas') || combined.includes('sleigh') || combined.includes('snow') || combined.includes('evergreen')) {
+    return 'Winter Pines & Starlight Sleigh Bell Stage';
+  }
+  if (opts.motif === 'podcast' || (opts.genre || '').toLowerCase().includes('podcast')) {
+    return 'Dual-Mic Broadcast Booth & Studio Soundwaves';
+  }
+  if (opts.motif === 'commercial') {
+    return 'Broadcast Megaphone & Studio On-Air Beacon';
+  }
+  if (combined.includes('hair metal') || combined.includes('sunset strip') || combined.includes('shred') || combined.includes('glam') || combined.includes('pyrotechnic')) {
+    return '80s Arena Lasers & Crossed Twin V-Guitars';
+  }
+  if (combined.includes('bridge') || combined.includes('river') || combined.includes('steel') || combined.includes('gold and black') || combined.includes('hometown')) {
+    return 'Riverfront Suspension Bridge & Stadium Floodlights';
+  }
+  if (combined.includes('disco') || combined.includes('roller') || combined.includes('mirrorball') || combined.includes('boogie') || combined.includes('skates')) {
+    return 'Crystal Mirrorball & Starlight Roller Rink';
+  }
+  if (combined.includes('coffee') || combined.includes('autumn') || combined.includes('cafe') || combined.includes('morning jam')) {
+    return 'Autumn Acoustic Warmth & Vinyl Coffeehouse';
+  }
+  if (combined.includes('country') || combined.includes('porch') || combined.includes('mountain') || combined.includes('canyon') || combined.includes('highway')) {
+    return 'Sunset Mountain Ridge & Acoustic Porchlight';
+  }
+  if (combined.includes('electronic') || combined.includes('synth') || combined.includes('neon') || combined.includes('circuit') || combined.includes('cyber')) {
+    return 'Neon Synthwave Horizon & Pulse Grid';
+  }
+  if (combined.includes('jazz') || combined.includes('blue-hour') || combined.includes('sax') || combined.includes('swing')) {
+    return 'Midnight Velvet Brass & Spotlight Club';
+  }
+  if (combined.includes('hip-hop') || combined.includes('rap') || combined.includes('verse') || combined.includes('boom') || combined.includes('street')) {
+    return 'City Skyline & Studio Monitor EQ Towers';
+  }
+  if (combined.includes('anime') || combined.includes('cloud') || combined.includes('adventure') || combined.includes('first light')) {
+    return 'Celestial Comet Sky & Radiant Horizon';
+  }
+  if (combined.includes('serenity') || combined.includes('water') || combined.includes('grace') || combined.includes('peace') || combined.includes('calm')) {
+    return 'Still Waters Reflection & Golden Dawn';
+  }
+  if (combined.includes('indie') || combined.includes('satellite') || combined.includes('window') || combined.includes('notebook')) {
+    return 'Crescent Moon Vinyl & Midnight Satellites';
+  }
+  if (combined.includes('pop') || combined.includes('bright') || combined.includes('heart') || combined.includes('skyline')) {
+    return 'Prismatic Starlight & Harmonic Ribbons';
+  }
+  return 'Live Arena Stage & Custom Harmonic Waveform';
+}
+
+export const createUniqueSongArtworkSvg = (opts: SongArtworkOptions): string => {
+  const rawTitle = (opts.title || '').trim() || 'Original Studio Track';
+  const rawGenre = (opts.genre || 'Studio Band').trim();
+  const rawHandle = (opts.creatorHandle || '@studio_voyager').trim();
+  const combined = `${rawTitle}|${rawGenre}|${opts.prompt || ''}|${opts.lyrics || ''}|${opts.seed ?? ''}|${opts.motif || 'band'}`;
+  const hash = hashSongString(combined);
+  const lower = combined.toLowerCase();
+
+  const palettes: [string, string, string, string][] = [
+    ['#0f172a', '#1e1b4b', '#f59e0b', '#fde68a'], // Obsidian & Stadium Gold
+    ['#2e1065', '#be185d', '#f43f5e', '#fbcfe8'], // Sunset Strip Magenta & Neon Rose
+    ['#1e1b4b', '#0284c7', '#38bdf8', '#e0f2fe'], // Electric Cyan & Deep Indigo
+    ['#431407', '#9a3412', '#fb923c', '#ffedd5'], // Autumn Amber & Canyon Copper
+    ['#064e3b', '#0f766e', '#34d399', '#d1fae5'], // Emerald Studio & Mint Glow
+    ['#3b0764', '#6d28d9', '#c084fc', '#f3e8ff'], // Velvet Violet & Prism Lavender
+    ['#111827', '#374151', '#fbbf24', '#fef3c7'], // Midnight Slate & Warm Brass
+    ['#4a044e', '#86198f', '#22d3ee', '#cffafe'], // Synthwave Cyber Fuchsia & Cyan
+    ['#14532d', '#166534', '#facc15', '#fef9c3'], // Pine Forest & Sunburst Gold
+    ['#7f1d1d', '#991b1b', '#fb7185', '#ffe4e6'], // Crimson Stage & Coral Spotlight
+    ['#1e3a8a', '#312e81', '#a78bfa', '#ede9fe'], // Twilight Horizon & Starlight
+    ['#27272a', '#52525b', '#38bdf8', '#bae6fd'], // Studio Titanium & Ice Blue
+  ];
+
+  let palette = palettes[hash % palettes.length];
+  if (lower.includes('hair metal') || lower.includes('sunset strip')) {
+    palette = ['#2e1065', '#9d174d', '#f59e0b', '#fbcfe8'];
+  } else if (lower.includes('gold & black') || lower.includes('gold and black') || lower.includes('steel city')) {
+    palette = ['#090d16', '#1e293b', '#f59e0b', '#fef08a'];
+  } else if (lower.includes('roller') || lower.includes('disco')) {
+    palette = ['#3b0764', '#9d174d', '#38bdf8', '#fde047'];
+  } else if (lower.includes('coffee') || lower.includes('autumn') || lower.includes('country') || lower.includes('porch')) {
+    palette = ['#431407', '#7c2d12', '#fb923c', '#fde68a'];
+  } else if (lower.includes('electronic') || lower.includes('synth')) {
+    palette = ['#0f172a', '#4c1d95', '#22d3ee', '#f472b6'];
+  } else if (lower.includes('serenity') || lower.includes('still waters')) {
+    palette = ['#064e3b', '#0f766e', '#38bdf8', '#ccfbf1'];
+  }
+
+  const [bgStart, bgMid, accent, highlight] = palette;
+  const gradAngle = 25 + (hash % 130);
+
+  // Generate 14 deterministic stars/sparkles unique to this song
+  let starsSvg = '';
+  for (let i = 0; i < 14; i++) {
+    const sh = hashSongString(`${combined}:star:${i}`);
+    const cx = 28 + (sh % 344);
+    const cy = 24 + ((sh >> 8) % 210);
+    const r = 1.2 + ((sh >> 16) % 28) / 10;
+    const op = 0.25 + ((sh >> 4) % 55) / 100;
+    starsSvg += `<circle cx="${cx}" cy="${cy}" r="${r.toFixed(1)}" fill="${i % 3 === 0 ? highlight : '#ffffff'}" fill-opacity="${op.toFixed(2)}" />`;
+  }
+
+  // Generate a song-specific 24-bar harmonic waveform across the lower-middle stage
+  let waveBarsSvg = '';
+  for (let i = 0; i < 24; i++) {
+    const wh = hashSongString(`${combined}:wave:${i}`);
+    const barH = 12 + (wh % 54);
+    const x = 44 + i * 13.2;
+    const y = 266 - barH / 2;
+    const color = i % 2 === 0 ? accent : highlight;
+    waveBarsSvg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="6" height="${barH}" rx="3" fill="${color}" fill-opacity="0.55" />`;
+  }
+
+  // Select coinciding central visual scene
+  let sceneSvg = '';
+  if (opts.motif === 'halloween' || lower.includes('halloween') || lower.includes('pumpkin')) {
+    sceneSvg = `
+      <circle cx="200" cy="158" r="78" fill="${accent}" fill-opacity="0.24" stroke="${accent}" stroke-width="3" />
+      <polygon points="164,138 180,115 194,142" fill="#ffffff" />
+      <polygon points="236,138 220,115 206,142" fill="#ffffff" />
+      <path d="M156 184 L174 198 L190 184 L200 198 L212 184 L228 198 L244 184" fill="none" stroke="${highlight}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+    `;
+  } else if (opts.motif === 'christmas' || lower.includes('christmas') || lower.includes('sleigh') || lower.includes('snowflake')) {
+    sceneSvg = `
+      <polygon points="200,64 138,162 170,162 122,232 278,232 230,162 262,162" fill="${accent}" fill-opacity="0.3" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" />
+      <circle cx="200" cy="54" r="10" fill="${highlight}" />
+      <circle cx="178" cy="148" r="5" fill="#ffffff" />
+      <circle cx="220" cy="196" r="6" fill="${highlight}" />
+    `;
+  } else if (opts.motif === 'podcast' || rawGenre.toLowerCase().includes('podcast')) {
+    sceneSvg = `
+      <circle cx="200" cy="155" r="76" fill="${accent}" fill-opacity="0.16" stroke="${accent}" stroke-width="2" />
+      <rect x="174" y="96" width="52" height="92" rx="26" fill="none" stroke="#ffffff" stroke-width="4.5" />
+      <path d="M150 146 A50 50 0 0 0 250 146" fill="none" stroke="${highlight}" stroke-width="4.5" stroke-linecap="round" />
+      <line x1="200" y1="196" x2="200" y2="236" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" />
+      <line x1="166" y1="236" x2="234" y2="236" stroke="${accent}" stroke-width="4.5" stroke-linecap="round" />
+    `;
+  } else if (lower.includes('hair metal') || lower.includes('sunset strip') || lower.includes('shred') || lower.includes('glam')) {
+    // 80s Arena Lasers & Crossed Twin V-Guitars + Lightning
+    sceneSvg = `
+      <line x1="40" y1="40" x2="200" y2="210" stroke="${highlight}" stroke-width="2" stroke-opacity="0.45" />
+      <line x1="360" y1="40" x2="200" y2="210" stroke="${accent}" stroke-width="2" stroke-opacity="0.45" />
+      <circle cx="200" cy="152" r="74" fill="${accent}" fill-opacity="0.22" stroke="${highlight}" stroke-width="2.5" />
+      <polygon points="135,215 192,130 172,225" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" />
+      <polygon points="265,215 208,130 228,225" fill="none" stroke="${highlight}" stroke-width="3.5" stroke-linejoin="round" />
+      <polyline points="204,70 184,126 210,126 188,186" fill="none" stroke="${highlight}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+    `;
+  } else if (lower.includes('bridge') || lower.includes('river') || lower.includes('steel') || lower.includes('gold & black') || lower.includes('gold and black') || lower.includes('hometown')) {
+    // Riverfront Suspension Bridge & Stadium Floodlights
+    sceneSvg = `
+      <circle cx="200" cy="136" r="68" fill="${accent}" fill-opacity="0.22" />
+      <line x1="125" y1="88" x2="125" y2="225" stroke="${highlight}" stroke-width="5" stroke-linecap="round" />
+      <line x1="275" y1="88" x2="275" y2="225" stroke="${highlight}" stroke-width="5" stroke-linecap="round" />
+      <path d="M55 195 Q125 105 200 185 Q275 105 345 195" fill="none" stroke="${accent}" stroke-width="3.5" />
+      <line x1="50" y1="196" x2="350" y2="196" stroke="#ffffff" stroke-width="4" stroke-linecap="round" />
+      <path d="M80 218 Q200 206 320 218" fill="none" stroke="${highlight}" stroke-width="2.5" stroke-opacity="0.7" />
+    `;
+  } else if (lower.includes('disco') || lower.includes('roller') || lower.includes('mirrorball') || lower.includes('boogie')) {
+    // Crystal Mirrorball & Starlight Rays
+    sceneSvg = `
+      <line x1="200" y1="36" x2="200" y2="86" stroke="#ffffff" stroke-width="3" />
+      <circle cx="200" cy="148" r="62" fill="${accent}" fill-opacity="0.28" stroke="#ffffff" stroke-width="3" />
+      <ellipse cx="200" cy="148" rx="62" ry="24" fill="none" stroke="${highlight}" stroke-width="2" stroke-opacity="0.75" />
+      <ellipse cx="200" cy="148" rx="26" ry="62" fill="none" stroke="${highlight}" stroke-width="2" stroke-opacity="0.75" />
+      <path d="M98 92 L106 108 L122 116 L106 124 L98 140 L90 124 L74 116 L90 108 Z" fill="${highlight}" />
+      <path d="M304 102 L310 114 L322 120 L310 126 L304 138 L298 126 L286 120 L298 114 Z" fill="#ffffff" />
+    `;
+  } else if (lower.includes('country') || lower.includes('porch') || lower.includes('mountain') || lower.includes('coffee') || lower.includes('autumn') || lower.includes('acoustic')) {
+    // Sunset Mountain Ridge & Acoustic Sun
+    sceneSvg = `
+      <circle cx="200" cy="138" r="56" fill="${highlight}" fill-opacity="0.32" stroke="${accent}" stroke-width="2.5" />
+      <path d="M40 230 L128 132 L195 192 L268 118 L360 230 Z" fill="${bgMid}" fill-opacity="0.85" stroke="${highlight}" stroke-width="3" stroke-linejoin="round" />
+      <circle cx="200" cy="195" r="22" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-opacity="0.8" />
+      <line x1="200" y1="92" x2="200" y2="230" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.6" />
+    `;
+  } else if (lower.includes('electronic') || lower.includes('synth') || lower.includes('neon') || lower.includes('circuit')) {
+    // Neon Synthwave Sun & Perspective Grid
+    sceneSvg = `
+      <circle cx="200" cy="142" r="64" fill="${accent}" fill-opacity="0.35" stroke="${highlight}" stroke-width="2.5" />
+      <line x1="130" y1="152" x2="270" y2="152" stroke="${bgStart}" stroke-width="4" />
+      <line x1="136" y1="168" x2="264" y2="168" stroke="${bgStart}" stroke-width="5" />
+      <line x1="40" y1="206" x2="360" y2="206" stroke="${highlight}" stroke-width="2.5" />
+      <line x1="200" y1="206" x2="80" y2="265" stroke="${accent}" stroke-width="2" stroke-opacity="0.65" />
+      <line x1="200" y1="206" x2="200" y2="265" stroke="${accent}" stroke-width="2" stroke-opacity="0.65" />
+      <line x1="200" y1="206" x2="320" y2="265" stroke="${accent}" stroke-width="2" stroke-opacity="0.65" />
+    `;
+  } else {
+    // Custom Vinyl & Prism Stage Wave
+    const ringRadius = 60 + (hash % 22);
+    sceneSvg = `
+      <circle cx="200" cy="150" r="${ringRadius + 24}" fill="none" stroke="${highlight}" stroke-width="1.8" stroke-opacity="0.35" stroke-dasharray="8 6" />
+      <circle cx="200" cy="150" r="${ringRadius}" fill="${accent}" fill-opacity="0.22" stroke="#ffffff" stroke-width="3" />
+      <circle cx="200" cy="150" r="24" fill="${bgStart}" stroke="${highlight}" stroke-width="3" />
+      <circle cx="200" cy="150" r="7" fill="#ffffff" />
+      <path d="M84 196 Q142 ${110 + (hash % 45)} 200 164 T316 142" fill="none" stroke="${highlight}" stroke-width="4" stroke-linecap="round" />
+    `;
+  }
+
+  const displayTitle = escapeSvgText(rawTitle.length > 26 ? `${rawTitle.slice(0, 24)}…` : rawTitle);
+  const displayGenre = escapeSvgText(rawGenre.toUpperCase());
+  const displayScene = escapeSvgText(describeSongPictureTheme(opts).trim());
+  const displayHandle = escapeSvgText(rawHandle);
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+    <defs>
+      <linearGradient id="bgGrad" gradientTransform="rotate(${gradAngle})">
+        <stop offset="0%" stop-color="${bgStart}" />
+        <stop offset="55%" stop-color="${bgMid}" />
+        <stop offset="100%" stop-color="${accent}" />
+      </linearGradient>
+    </defs>
+    <rect width="400" height="400" fill="url(#bgGrad)" />
+    <circle cx="${60 + (hash % 280)}" cy="${50 + ((hash >> 3) % 120)}" r="135" fill="${highlight}" fill-opacity="0.12" />
+    <circle cx="${320 - (hash % 220)}" cy="320" r="150" fill="#ffffff" fill-opacity="0.06" />
+    ${starsSvg}
+    ${sceneSvg}
+    ${waveBarsSvg}
+    <rect x="20" y="18" width="360" height="30" rx="10" fill="#090d16" fill-opacity="0.48" />
+    <text x="34" y="37" fill="${highlight}" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2">${displayGenre}</text>
+    <text x="366" y="37" text-anchor="end" fill="#ffffff" fill-opacity="0.85" font-family="monospace" font-size="11" font-weight="600">${displayHandle}</text>
+    <rect x="20" y="302" width="360" height="78" rx="16" fill="#090d16" fill-opacity="0.76" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1" />
+    <text x="36" y="334" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="19" font-weight="800">${displayTitle}</text>
+    <text x="36" y="358" fill="${highlight}" font-family="system-ui, -apple-system, sans-serif" font-size="11.5" font-weight="600">${displayScene}</text>
+  </svg>`;
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
+
 /**
  * Generates a crisp, zero-broken-image SVG Data URI cover art with custom colors and motifs.
  */
@@ -19,8 +278,20 @@ export const createStudioCoverSvg = (
   bgStart: string,
   bgEnd: string,
   accent: string,
-  motif: 'band' | 'podcast' | 'commercial' | 'halloween' | 'christmas' | 'radio'
+  motif: 'band' | 'podcast' | 'commercial' | 'halloween' | 'christmas' | 'radio',
+  title?: string,
+  genre?: string,
+  prompt?: string
 ): string => {
+  if (title || genre || prompt) {
+    return createUniqueSongArtworkSvg({
+      title,
+      genre,
+      prompt,
+      motif,
+      seed: `${bgStart}-${bgEnd}-${accent}`,
+    });
+  }
   const motifShapes = {
     band: `
       <circle cx="200" cy="200" r="130" fill="none" stroke="${accent}" stroke-width="2" stroke-opacity="0.35" />
@@ -203,7 +474,13 @@ export const INITIAL_COMMUNITY_SONGS: SongResult[] = [
       '[AI Identifier] Tagged as AI-Generated Material in respect of human artists.',
     ],
     audioUrl: null,
-    coverImageUrl: createStudioCoverSvg('#1e1b4b', '#7f1d1d', '#f59e0b', 'band'),
+    coverImageUrl: createUniqueSongArtworkSvg({
+      title: 'Steel City Gold & Black',
+      genre: 'Rock Band',
+      prompt: 'Friday Night Hometown Game under the river bridges in black and gold',
+      creatorHandle: '@riverfront_rockers',
+      seed: 'seed-band-1',
+    }),
     title: 'Steel City Gold & Black',
     creatorHandle: '@riverfront_rockers',
     bandType: 'Rock Band',
@@ -249,7 +526,13 @@ export const INITIAL_COMMUNITY_SONGS: SongResult[] = [
       '[Human + AI] Creator layered live tambourine & lead vocal hook over backing band.',
     ],
     audioUrl: null,
-    coverImageUrl: createStudioCoverSvg('#3b0764', '#9d174d', '#38bdf8', 'band'),
+    coverImageUrl: createUniqueSongArtworkSvg({
+      title: 'Starlight Roller Boogie',
+      genre: 'Disco Band',
+      prompt: 'Crystal mirrorball spinning over a Saturday night roller disco rink',
+      creatorHandle: '@velvet_groove_fm',
+      seed: 'seed-band-2',
+    }),
     title: 'Starlight Roller Boogie',
     creatorHandle: '@velvet_groove_fm',
     bandType: 'Disco Band',
