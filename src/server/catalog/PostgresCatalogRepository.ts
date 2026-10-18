@@ -83,6 +83,60 @@ CREATE TABLE IF NOT EXISTS docs (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS docs_unique_pair_idx ON docs (collection, k1, k2) WHERE k1 IS NOT NULL AND k2 IS NOT NULL;
 CREATE INDEX IF NOT EXISTS docs_lookup_idx ON docs (collection, k1, n1);
+
+-- Automatic production bootstrap tables for tracks, shows, episodes, and governance_logs
+CREATE TABLE IF NOT EXISTS tracks (
+  id                 TEXT PRIMARY KEY,
+  creator_id         TEXT REFERENCES creators(id) ON DELETE CASCADE,
+  title              TEXT NOT NULL,
+  genre              TEXT NOT NULL,
+  audio_url          TEXT NOT NULL,
+  duration_label     TEXT,
+  vocal_arrangement  TEXT,
+  lyrics             TEXT NOT NULL DEFAULT '',
+  provenance         TEXT NOT NULL DEFAULT 'AI-Generated Material',
+  is_published       BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS tracks_creator_idx ON tracks (creator_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS shows (
+  id            TEXT PRIMARY KEY,
+  creator_id    TEXT NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
+  title         TEXT NOT NULL,
+  description   TEXT NOT NULL DEFAULT '',
+  author        TEXT NOT NULL DEFAULT '',
+  language      TEXT NOT NULL DEFAULT 'en',
+  category      TEXT NOT NULL DEFAULT 'Arts',
+  explicit      BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS shows_creator_idx ON shows (creator_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS episodes (
+  creation_id     TEXT PRIMARY KEY REFERENCES creations(id) ON DELETE CASCADE,
+  show_id         TEXT NOT NULL,
+  publish_state   TEXT NOT NULL DEFAULT 'draft',
+  scheduled_for   TIMESTAMPTZ,
+  published_at    TIMESTAMPTZ,
+  episode_number  INTEGER NOT NULL DEFAULT 1,
+  hold_reason     TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS episodes_show_idx ON episodes (show_id, episode_number ASC);
+
+CREATE TABLE IF NOT EXISTS governance_logs (
+  id            TEXT PRIMARY KEY,
+  creation_id   TEXT NOT NULL,
+  action        TEXT NOT NULL,
+  actor         TEXT NOT NULL DEFAULT 'system',
+  reason        TEXT,
+  metadata      JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS governance_logs_creation_idx ON governance_logs (creation_id, created_at DESC);
 `;
 
 const iso = (v: unknown): string => (v instanceof Date ? v.toISOString() : String(v));
@@ -149,6 +203,10 @@ export class PostgresCatalogRepository implements CatalogRepository {
 
   constructor(private readonly connectionString: string) {}
 
+  async bootstrapSchema(): Promise<void> {
+    await this.pool.query(SCHEMA);
+  }
+
   async init(): Promise<void> {
     const { default: pg } = await import('pg');
     this.pool = new pg.Pool({
@@ -156,7 +214,7 @@ export class PostgresCatalogRepository implements CatalogRepository {
       max: Number(process.env.DATABASE_POOL_MAX || 10),
       ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
     });
-    await this.pool.query(SCHEMA);
+    await this.bootstrapSchema();
   }
 
   async close(): Promise<void> {

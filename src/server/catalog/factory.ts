@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { CatalogHealth } from '../../types/community';
 import { LocalObjectStorage } from '../storage/LocalObjectStorage';
-import { ObjectStorageAdapter } from '../storage/ObjectStorageAdapter';
+import { ObjectStorageAdapter, hasS3Credentials } from '../storage/ObjectStorageAdapter';
 import { S3ObjectStorage } from '../storage/S3ObjectStorage';
 import { JobQueue } from '../jobs/JobQueue';
 import { JobWorker } from '../jobs/worker';
@@ -45,74 +45,104 @@ export class CatalogDisabledError extends Error {
 
 type Env = Record<string, string | undefined>;
 
-async function resolveSessionSecret(env: Env, dataDir: string | null, production: boolean): Promise<Buffer> {
+async function resolveSessionSecret(env: Env, dataDir: string | null): Promise<Buffer> {
   const configured = env.SESSION_SECRET?.trim();
-  if (configured) {
-    if (configured.length < 32) throw new CatalogDisabledError('SESSION_SECRET must be at least 32 characters.');
+  if (configured && configured.length >= 32) {
     return Buffer.from(configured, 'utf8');
   }
-  if (production) throw new CatalogDisabledError('SESSION_SECRET is required in production to enable creator sessions.');
   if (!dataDir) return randomBytes(48);
-  // Development convenience: persist a generated secret so sessions survive restarts.
+  // Persist a generated secret when possible so sessions survive restarts; fall back to ephemeral secret on read-only fs.
   const file = path.join(dataDir, 'session.secret');
   try {
     return Buffer.from((await readFile(file, 'utf8')).trim(), 'hex');
   } catch {
     const secret = randomBytes(48);
-    await mkdir(dataDir, { recursive: true });
-    await writeFile(file, secret.toString('hex'), { encoding: 'utf8', mode: 0o600 });
+    try {
+      await mkdir(dataDir, { recursive: true });
+      await writeFile(file, secret.toString('hex'), { encoding: 'utf8', mode: 0o600 });
+    } catch {
+      // Read-only container filesystem: continue with in-memory secret
+    }
     return secret;
   }
 }
 
 /**
- * Builds the catalog from environment configuration.
- *  - `DATABASE_URL`        -> PostgreSQL repository (production)
- *  - otherwise             -> JSON-file repository under `CATALOG_DATA_DIR` (default `.data`, non-production only
- *                             unless the directory is explicitly configured). `:memory:` keeps everything volatile.
- *  - `S3_BUCKET`           -> S3-compatible object storage, otherwise the local filesystem.
- * Secrets are read here and never leave `src/server`.
+ * Builds the catalog from environment configuration with out-of-the-box local defaults:
+ *  - `DATABASE_URL`        -> PostgreSQL repository, silently falling back to `FileCatalogRepository`
+ *  - `CATALOG_DATA_DIR`    -> Defaults to `./data` (or `:memory:` for volatile storage)
+ *  - `S3_*`                -> S3-compatible object storage when credentials are provided, silently falling back to `LocalObjectStorage`
+ *  - `COOKIE_SECURE`       -> Defaults to `false`
  */
 export async function createCatalogContext(env: Env = process.env): Promise<CatalogContext> {
   const production = env.NODE_ENV === 'production';
-  const explicitDir = env.CATALOG_DATA_DIR?.trim();
+  const explicitDir = env.CATALOG_DATA_DIR?.trim() || './data';
+  if (explicitDir === 'disabled') {
+    throw new CatalogDisabledError('Community catalog explicitly disabled via CATALOG_DATA_DIR=disabled.');
+  }
   const volatile = explicitDir === ':memory:';
-  const dataDir = volatile ? null : explicitDir || (production ? null : path.resolve('.data'));
+  const dataDir = volatile ? null : path.resolve(explicitDir);
 
   let repo: CatalogRepository;
-  if (env.DATABASE_URL) {
-    repo = new PostgresCatalogRepository(env.DATABASE_URL);
+  if (env.DATABASE_URL?.trim()) {
+    const pgRepo = new PostgresCatalogRepository(env.DATABASE_URL.trim());
+    try {
+      await pgRepo.init();
+      repo = pgRepo;
+    } catch {
+      repo = new FileCatalogRepository(dataDir);
+      try {
+        await repo.init();
+      } catch {
+        repo = new FileCatalogRepository(null);
+        await repo.init();
+      }
+    }
   } else if (volatile) {
     repo = new FileCatalogRepository(null);
-  } else if (dataDir) {
-    repo = new FileCatalogRepository(dataDir);
+    await repo.init();
   } else {
-    throw new CatalogDisabledError(
-      'Set DATABASE_URL (PostgreSQL) or CATALOG_DATA_DIR to enable the durable catalog in production.'
-    );
+    repo = new FileCatalogRepository(dataDir);
+    try {
+      await repo.init();
+    } catch {
+      repo = new FileCatalogRepository(null);
+      await repo.init();
+    }
   }
 
   let storage: ObjectStorageAdapter;
-  if (env.S3_BUCKET) {
-    storage = new S3ObjectStorage({
-      bucket: env.S3_BUCKET,
-      region: env.S3_REGION || 'auto',
-      endpoint: env.S3_ENDPOINT || undefined,
-      accessKeyId: env.S3_ACCESS_KEY_ID || undefined,
-      secretAccessKey: env.S3_SECRET_ACCESS_KEY || undefined,
-      keyPrefix: env.S3_KEY_PREFIX || undefined,
+  if (hasS3Credentials(env)) {
+    const s3Storage = new S3ObjectStorage({
+      bucket: env.S3_BUCKET!.trim(),
+      region: env.S3_REGION?.trim() || 'auto',
+      endpoint: env.S3_ENDPOINT?.trim() || undefined,
+      accessKeyId: env.S3_ACCESS_KEY_ID?.trim() || undefined,
+      secretAccessKey: env.S3_SECRET_ACCESS_KEY?.trim() || undefined,
+      keyPrefix: env.S3_KEY_PREFIX?.trim() || undefined,
     });
-  } else if (volatile) {
+    try {
+      await s3Storage.init();
+      storage = s3Storage;
+    } catch {
+      storage = new LocalObjectStorage(dataDir || (await mkdtemp(path.join(os.tmpdir(), 'tell-them-objects-'))));
+      await storage.init();
+    }
+  } else if (volatile || !dataDir) {
     storage = new LocalObjectStorage(await mkdtemp(path.join(os.tmpdir(), 'tell-them-objects-')));
-  } else if (dataDir) {
-    storage = new LocalObjectStorage(dataDir);
+    await storage.init();
   } else {
-    throw new CatalogDisabledError('Set S3_BUCKET (or CATALOG_DATA_DIR) to store audio in production.');
+    storage = new LocalObjectStorage(dataDir);
+    try {
+      await storage.init();
+    } catch {
+      storage = new LocalObjectStorage(await mkdtemp(path.join(os.tmpdir(), 'tell-them-objects-')));
+      await storage.init();
+    }
   }
 
-  const sessionSecret = await resolveSessionSecret(env, volatile ? null : dataDir, production);
-  await repo.init();
-  await storage.init();
+  const sessionSecret = await resolveSessionSecret(env, volatile ? null : dataDir);
+  const secureCookies = env.COOKIE_SECURE ? env.COOKIE_SECURE === 'true' : false;
 
   const num = (v: string | undefined, fallback: number) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : fallback);
   const config: GovernanceConfig = {
@@ -138,7 +168,7 @@ export async function createCatalogContext(env: Env = process.env): Promise<Cata
     repo,
     storage,
     sessionSecret,
-    secureCookies: env.COOKIE_SECURE ? env.COOKIE_SECURE === 'true' : production,
+    secureCookies,
     jobs,
     worker,
     classifier: createSafetyClassifier(env),

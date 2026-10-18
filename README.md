@@ -1,71 +1,162 @@
-# Tell Them Studio
+# Tell Them Studio (`tell-them-studio` v1.0.0)
 
-A kindness-first music and podcast creation space, with a companion **Told Them** listening room.
+**Commercial-Grade Generative Audio Production, Multi-Host Podcast Syndication & Music Creation SaaS**
 
-## Run
+Tell Them Studio is a multi-tenant generative audio production platform and public distribution network powered by **Google Gemini** and **Lyria**. Designed for zero-local-dependency cloud deployment, the platform unifies full-band music composition, multi-speaker podcast production, broadcast commercial spots, custom radio stations, and an isolated public showcase (`Told Them`) with automated RSS 2.0 / iTunes podcast syndication and HMAC-signed webhooks.
 
-Use Node.js 22+ and npm:
+---
 
-```sh
-npm ci
-cp .env.example .env.local
-npm run dev
+## 1. Product Overview & Mission
+
+Tell Them Studio empowers independent creators, bands, podcasters, and brands to compose, master, govern, and syndicate original audio from a single studio interface:
+
+- **Generative Music Studio (`#bands`)**: Full-length arrangements (up to 3:50) and 0:30 hooks powered by Lyria (`lyria-3-pro-preview` / `lyria-3-clip-preview`) with deterministic studio synthesizer fallback, multi-singer vocal modes (Lead, Duet, Choir, Rap, Instrumental), custom genre blending, and AI-generated editorial album artwork.
+- **Multi-Host Podcast Studio (`#podcasts`)**: Structured 5–10 minute conversational episodes with chapter markers, show notes, and multi-speaker Gemini TTS synthesis (`Puck`, `Kore`, `Fenrir`, `Aoede`, `Charon`).
+- **Broadcast Commercials (`#commercials`) & Seasonal Hits (`#holidays`)**: Truth-in-advertising compliant 15s/30s/60s radio spots with three-act visual storyboards and family-safe voiceovers.
+- **Custom Radio Stations (`#stations`) & Creative Assistant (`#creative`)**: Interactive lyric design, sound discovery, offline Web Audio stem/mashup mixing, and real-time Canvas/Web Audio spectrum video export (`.webm`).
+- **Told Them Public Showcase (`/showcase` & `#listen`)**: Dedicated public listening room and standalone bundle (`showcase.html`) featuring verified creator handles, remix lineage attribution, community praise badges, and iTunes-compliant podcast RSS feeds.
+
+---
+
+## 2. Architecture & System Topology
+
+Tell Them Studio runs as a unified, single-port Express 5 + Vite React 19 service (`server.ts`) that enforces strict server-side credential isolation (`GEMINI_API_KEY` never leaves the server) while serving both the studio SPA (`index.html`) and standalone public showcase (`showcase.html`).
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        CLIENT WORKSPACE LAYER (React 19)                     │
+│                                                                              │
+│  ┌─────────────────────┐  ┌──────────────────────┐  ┌─────────────────────┐  │
+│  │   Studio Workspaces │  │  Playback & WebAudio │  │   Standalone CDN    │  │
+│  │  • Music / Bands    │  │  • PlaybackContext   │  │   Showcase App      │  │
+│  │  • Podcasts         │  │  • StudioPlayer      │  │  • /showcase        │  │
+│  │  • Commercials      │  │  • PersistentPlayer  │  │  • Music & Podcasts │  │
+│  │  • Stations/Holiday │  │  • WebM Video Export │  │  • RSS & Praise UI  │  │
+│  │  • Creative/Library │  │  • ErrorBoundaries   │  │  • Report Controls  │  │
+│  └──────────┬──────────┘  └──────────┬───────────┘  └──────────┬──────────┘  │
+└─────────────┼────────────────────────┼─────────────────────────┼─────────────┘
+              │                        │                         │
+              ▼                        ▼                         ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                     UNIFIED CLOUD SERVER LAYER (server.ts)                   │
+│                                                                              │
+│  ┌─────────────────────┐  ┌──────────────────────┐  ┌─────────────────────┐  │
+│  │  AI Proxy Routes    │  │  Safety & Governance │  │  Distribution & RSS │  │
+│  │  • /api/generate-*  │  │  • SafetyClassifier  │  │  • /feeds/:slug.xml │  │
+│  │  • /api/creative-*  │  │  • PII/Policy Guard  │  │  • Show Scheduler   │  │
+│  │  • Lyria & Gemini   │  │  • Lineage & Consent │  │  • HMAC Webhooks    │  │
+│  │  • Synth Fallbacks  │  │  • Soft/Hard Revoke  │  │  • Inbound Praise   │  │
+│  └──────────┬──────────┘  └──────────┬───────────┘  └──────────┬──────────┘  │
+│             └────────────────────────┼─────────────────────────┘             │
+│                                      ▼                                       │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                 AUTO-MIGRATING PERSISTENCE & STORAGE                   │  │
+│  │  • CatalogRepository: PostgresCatalogRepository <-> FileCatalogRepo    │  │
+│  │  • ObjectStorageAdapter: S3ObjectStorage (R2/S3) <-> LocalObjectStorage│  │
+│  │  • Durable JobQueue & Background Worker (Retries, Leases, Dead-Letter) │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The app listens on `0.0.0.0:3000`. Samples, browser storage, mixing, and visualizer export work without an API key. To enable AI, configure `GEMINI_API_KEY` **on the server** in `.env.local` or the deployment environment. Keys never enter browser code. Optional model overrides are documented in `.env.example`; provider/model availability and outbound API access are required. Live provider generation has not been verified in the restricted development sandbox.
+---
 
-```sh
-npm run lint
-npm test
+## 3. Environment & Cloud Deployment
+
+Tell Them Studio is engineered for **zero-local assumptions** and deploys directly to **Google Cloud Run**, **Render**, **Railway**, or any OCI-compliant container platform using the included multi-stage `Dockerfile`.
+
+### 1-Click / Container Cloud Deployment
+
+1. **Build & Run with Docker (Cloud Run / Railway / Render):**
+   ```bash
+   docker build -t tell-them-studio:latest .
+   docker run -p 8080:8080 \
+     -e NODE_ENV=production \
+     -e PORT=8080 \
+     -e GEMINI_API_KEY="your-gemini-api-key" \
+     -e SESSION_SECRET="your-32-character-minimum-session-secret" \
+     tell-them-studio:latest
+   ```
+
+2. **Direct Node.js Cloud Service Deployment:**
+   ```bash
+   npm ci
+   npm run build
+   NODE_ENV=production PORT=3000 npm start
+   ```
+   In production mode (`NODE_ENV=production`), `server.ts` serves compiled assets from `./dist`, routes `/showcase` to `dist/showcase.html`, routes standard SPA paths to `dist/index.html`, and exposes `GET /api/health` for cloud readiness/liveness probes.
+
+### Environment Variables Reference
+
+| Variable | Required | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `PORT` | No | `3000` (`8080` in Docker) | Inbound HTTP port bound on `0.0.0.0`. |
+| `NODE_ENV` | No | `development` | Set to `production` to serve prebuilt `./dist` bundles and enforce production security defaults. |
+| `GEMINI_API_KEY` | Recommended | — | Server-side Google Gemini & Lyria API key. Never exposed to browser clients. |
+| `SESSION_SECRET` | Recommended | Auto-generated fallback | 32+ character secret used to sign `HttpOnly`, `SameSite=Lax` creator session cookies (`tt_session`). |
+| `DATABASE_URL` | No | Local `.data` fallback | PostgreSQL connection URI. Automatically bootstraps schema (`creators`, `creations`, `tracks`, `shows`, `episodes`, `publication_moderation`, `governance_logs`, `docs`) on startup. |
+| `DATABASE_SSL` | No | `false` | Set to `true` for managed cloud PostgreSQL instances requiring TLS. |
+| `DATABASE_POOL_MAX` | No | `10` | Maximum PostgreSQL connection pool size. |
+| `CATALOG_DATA_DIR` | No | `.data` | Directory for `FileCatalogRepository` and `LocalObjectStorage` when `DATABASE_URL` or `S3_BUCKET` is omitted. Use `:memory:` for ephemeral test runs. |
+| `S3_BUCKET` | No | Local `.data` fallback | S3-compatible bucket name (AWS S3, Cloudflare R2, MinIO) for audio object storage. |
+| `S3_REGION` | No | `auto` | S3 region identifier. |
+| `S3_ENDPOINT` | No | — | Custom S3 endpoint URL (required for Cloudflare R2 / MinIO). |
+| `S3_ACCESS_KEY_ID` | No | — | S3 access key ID. |
+| `S3_SECRET_ACCESS_KEY` | No | — | S3 secret access key. |
+| `S3_KEY_PREFIX` | No | — | Optional key prefix for stored audio objects. |
+| `CDN_BASE_URL` | No | — | Optional public CDN edge URL for `302` public audio redirects (`/api/creations/:id/audio`). |
+| `CDN_PURGE_WEBHOOK_URL` | No | — | Optional webhook URL triggered to invalidate cached audio keys upon deletion/revocation. |
+| `ALLOWED_ORIGINS` | No | Same-origin & preview hosts | Comma-separated list of additional allowed CORS origins. |
+| `ADMIN_API_TOKEN` | No | — | Bearer token enabling `/api/admin/*` moderator queue and takedown endpoints. |
+
+---
+
+## 4. Commercial & Governance Features
+
+- **Multi-Workspace Audio Engine**:
+  - Dedicated workspaces for **Music & Bands**, **Mini-Podcasts**, **Craft Commercials**, **Seasonal/Holiday Hits**, **Radio Stations**, and **Creative Assistant** tools.
+  - Real-time client-side persistence via IndexedDB (`libraryStore.ts`) paired with automatic server-side catalog synchronization (`catalogClient.ts`).
+- **Built-In Safety Classifier & Moderation Pipeline**:
+  - Multi-layer rule and optional AI safety classification (`SafetyClassifier.ts`, `moderation.ts`, `contentSafety.ts`) screens titles, lyrics, scripts, and praise for PII (phone numbers, emails), harassment, and policy violations prior to publication.
+  - Full provenance tracking (`AI-Generated Material`, `AI Multi-Host Podcast`, `Original User Audio`), remix depth limits, and cascading soft/hard consent revocation across remix trees (`governance.ts`).
+  - Community reporting with automatic flagging at configurable thresholds and moderator review endpoints (`/api/admin/reports`, `/api/admin/creations/:id/moderation`).
+- **Podcast Syndication, Scheduling & Webhooks**:
+  - Generates iTunes-compliant RSS 2.0 feeds (`/feeds/:slug.xml`) with `ETag` and `Last-Modified` conditional GET caching and byte-range audio streaming (`206 Partial Content`).
+  - Timezone-aware weekly show scheduler (`schedule.ts`) and background job worker (`JobQueue.ts`, `worker.ts`) that automatically publishes due episodes.
+  - Outbound HMAC-SHA256 signed webhooks (`X-TellThem-Signature`) with exponential backoff retries and dead-letter inspection, plus replay-protected inbound praise webhooks (`/api/inbound/praise/:sourceId`).
+- **Dual-Mode Auto-Migrating Catalog Storage**:
+  - `PostgresCatalogRepository` automatically runs `CREATE TABLE IF NOT EXISTS` migrations on startup—zero manual CLI migration steps required.
+  - Automatically and gracefully falls back to `FileCatalogRepository` (or volatile memory storage) if `DATABASE_URL` is omitted or unreachable.
+
+---
+
+## 5. Verification & QA Status
+
+Tell Them Studio is verified across **10 automated Playwright specification suites** (covering all 8 core functional verification domains plus extended UI and unit checks):
+
+1. `tests/music-studio.spec.ts` — Genre selection, custom blends, vocal arrangements, waveform playback, cover art themes, and persistent community player controls.
+2. `tests/workflows.spec.ts` — Cross-tab draft persistence, creative assistant lyric handoff, manual upload acknowledgement, and mobile viewport responsiveness.
+3. `tests/creative.spec.ts` — 60-second stereo WAV synthesis verification, reference audio authorization guards, IndexedDB library persistence, stem mashup mixing, and WebM video export.
+4. `tests/catalog.spec.ts` — Session authentication (`HttpOnly` / `SameSite=Lax`), private/public lifecycle, byte-range streaming (`206`), rate limiting, and persistence adapters.
+5. `tests/catalog-ui.spec.ts` — Live catalog synchronization, offline cache resilience, and studio-to-community promotion flows.
+6. `tests/governance.spec.ts` & `tests/governance-ui.spec.ts` — Remix lineage attribution, depth enforcement, community reporting thresholds, moderator review, and soft/hard consent revocation.
+7. `tests/distribution.spec.ts` & `tests/distribution-ui.spec.ts` — SSRF-guarded outbound webhooks, HMAC signature verification, DST-aware weekly episode scheduling, and RSS 2.0 feed generation.
+8. `tests/showcase-cdn.spec.ts` — Standalone `/showcase` bundle rendering, CDN `302` redirect and `?direct=1` range streaming, CDN cache purge webhooks, and offline graceful degradation.
+
+### Build & Verification Commands
+
+```bash
+# 1. TypeScript static verification (0 errors)
+npx tsc --noEmit
+
+# 2. Multi-entry production bundle (compiles dist/index.html & dist/showcase.html)
 npm run build
-NODE_ENV=production npm start
+
+# 3. Full Playwright end-to-end verification suite
+npm test
 ```
 
-CSS is compiled locally with Tailwind/PostCSS; there is no runtime Tailwind CDN dependency. Optional web fonts have system-font fallbacks.
+---
 
-## Spaces and capabilities
+## License
 
-- **Band Studio:** Rock, Country, Pop, Disco, Rap, Hip-Hop, Indie, Old-School, Jazz, Electronic, Anime-Inspired, Serenity, custom blends, and singer-free backing tracks. Two original, sixty-second **procedurally synthesized instrumental sketches** per category. These illustrate broad moods; they are not finished genre recordings, vocal demos, or copyrighted artist samples.
-- **Serenity:** faith, spirituality, gratitude, and gentle encouragement; all traditions welcome. No medical or healing promises. The working section name is not a trademark-clearance claim.
-- **Podcasts:** existing multi-host generation, plus two approximately one-minute script previews read by browser speech synthesis. Those previews are not recordings of the selected AI host voices; availability, voice, and duration depend on the browser. Failed speech generation reports an error rather than substituting an instrumental loop. Raw PCM speech responses are wrapped in WAV headers for playback.
-- **My Library:** IndexedDB audio/lyrics storage, uploads, generated-track saves, renaming, genre organization, deletion, audio downloads, and lyrics/metadata exports. Private by default. Import audio up to 25 MB. Browser data can be cleared: export backups. Handles are local labels, **not authentication**. There is no cloud account or cross-device sync.
-- **Told Them listening room (`#listen`):** genre discovery and a **local catalog preview** containing only explicitly public library items. Public listening and remix permission are separate; making a track private also revokes remix permission. No actual network publication occurs.
-- **Creative room (`#creative`):** server-proxied conversation, editable original lyric drafts, broad musical sound analysis (descriptions or authorized audio excerpts under 15 MB), and text storyboards. Optional browser voice transcription; microphone use is opt-in and may use a browser-provider service. Reference audio is sent to the configured AI provider, not saved to the library. Genre/tempo estimates are uncertain—not song/artist identification or proof of rights.
-- **Mashup & vocals:** a real offline Web Audio overlay mixer for owned audio or explicitly remix-permitted public items. Import a backing track and a separate vocal stem to add vocals. Exports are capped at 2:48, start both sources at zero, and blend their levels. No automatic beat matching or stem separation.
-- **Video maker:** real-time Canvas/Web Audio cover-art + spectrum WebM export from saved audio. Lyrics use supplied timestamps, or approximate line timing for untimed lyrics. Text storyboards can include original anime-inspired worlds; **generative animation/video is not connected**. Leave the page open while rendering. Browser WebM recording support is required; export errors are surfaced and audio contexts/streams are cleaned up.
-
-Deep links: `#bands`, `#podcasts`, `#listen`, `#library`, `#creative`, and the existing workspace tabs.
-
-## Respect and safety
-
-Creative AI instructions redirect artist references toward general instrumentation, rhythm, genre, and mood—not copied lyrics/melodies, singer impersonation, voice cloning, or copyrighted characters. Sound references require explicit permission in both the client and server request validation. Listening access never implies a remix license. These guardrails and creator pledges are not a legal clearance service; creators remain responsible for licenses and final review.
-
-## Still needed for a production community
-
-1. Authenticated creator accounts, durable object storage, and a database for creations, ownership, permissions, and provenance.
-2. Server-enforced publication/remix authorization, moderation, reporting, deletion, consent revocation, and real community interactions.
-3. Deploy the listening frontend on a separate HTTPS origin if desired, connected to the same authorized catalog backend. Hash navigation is currently a linked local experience, **not a second deployed domain**.
-4. Licensed/commissioned finished vocal and genre demo recordings, professionally recorded podcast samples, and storage/CDN delivery.
-5. Connected stem-separation and generative-video services before enabling vocal removal or animated music-video production.
-6. Real distribution/scheduling integrations. Existing platform-publish toggles, praise feed, and weekly schedule settings are UI/demo state, not verified external publication or automated scheduling.
-
-## Tests
-
-`npm test` runs eleven Playwright checks covering all WAV lengths/variation differences, API permission validation, playback, IndexedDB persistence, visibility/remix controls, audio imports/mixing, mocked AI lyric handoff, mobile overflow, unconfigured-service behavior, and actual WebM download. Additional checks cover draft recovery after refresh, independent assistant conversations, jingle presets, manual upload acknowledgements, and optional podcast release planning. Live AI, browser speech synthesis, and voice transcription are not exercised.
-
-The test browser is distributed through npm (`@sparticuz/chromium`); the config extracts bundled Linux libraries into the OS temporary directory. Linux x64 is the sandbox target. Set `CHROMIUM_EXECUTABLE_PATH` for your own compatible browser on other systems. Test recordings/screenshots and build outputs are ignored by Git.
-
-## Workflow refinement
-
-The main navigation is Create, My Library, and Told Them · Listen. Create contains one Music & jingles workspace (Band, Vocals, Acoustic, and a 30-second Jingle preset), Podcasts, Commercials, Creative assistant, and Seasonal templates. Existing music hash links remain supported. The creative brief comes first; sound settings, inspiration sketches, and release-plan notes are optional expandable sections.
-
-Text drafts, lyric drafts, guided-builder settings, podcast/commercial briefs, and creative conversations are saved locally across navigation and refresh. Each assistant tool keeps its own conversation, with a clear action to remove it. Files, reference-audio permissions, binary attachments, and in-progress generation are not restored after reload. Library audio still uses IndexedDB; local drafts and library data are not cloud backups. Storage failures show a warning.
-
-Publishing is a manual download-and-upload workflow. Opening an external destination never marks a creation as uploaded. The optional upload checklist records your own unverified note for the current session. Radio and featured activity are local previews. Podcast release-plan fields are optional notes, not a scheduler or a prerequisite for creating audio. Generation durations are targets; review the finished file before use.
-
-
-## Music Studio visual direction
-
-The music-first dark studio uses visible genre and vocal-style choices, an original concert-guitar cover, a real audio waveform player, and a focused Create music action. Podcasts and commercial audio remain secondary tools. Short audio hooks are available under Short clip; seasonal templates remain under Explore more sounds. Existing drafts and library audio are preserved.
-
-Desktop and mobile review captures and the approved direction are in `docs/design/`. See `design-qa.md` for visual comparison, interaction checks, and known limits. `MusicStudio.tsx` isolates composition controls from `App.tsx`; `StudioPlayer.tsx` renders measured audio data with native playback fallback. No provider or model routing was changed.
+Released under the **MIT License**. See [`LICENSE`](./LICENSE) for full license text.

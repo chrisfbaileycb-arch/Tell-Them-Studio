@@ -142,7 +142,23 @@ export function createCatalogRouter(opts: CatalogRouteOptions): Router {
     const origin = req.headers.origin;
     if (!origin) return next();
     try {
-      if (new URL(origin).host === req.headers.host) return next();
+      const parsed = new URL(origin);
+      const originHost = parsed.host.toLowerCase();
+      const originHostname = parsed.hostname.toLowerCase();
+      const reqHost = (req.headers.host || '').toLowerCase();
+      const fwdHosts = String(req.headers['x-forwarded-host'] || '')
+        .split(',')
+        .map((h) => h.trim().toLowerCase())
+        .filter(Boolean);
+      if (originHost === reqHost || fwdHosts.includes(originHost)) return next();
+      if (
+        originHostname.endsWith('.run.app') ||
+        originHostname.endsWith('.e2b.app') ||
+        originHostname.endsWith('.googleusercontent.com') ||
+        originHostname === 'aistudio.google.com'
+      ) {
+        return next();
+      }
     } catch {
       /* fall through to rejection */
     }

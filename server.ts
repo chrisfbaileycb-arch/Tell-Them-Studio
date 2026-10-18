@@ -17,47 +17,65 @@ const app = express();
 const portFlag = process.argv.indexOf('--port');
 const PORT = Number(process.env.PORT || (portFlag >= 0 ? process.argv[portFlag + 1] : 3000));
 
-const defaultDevOrigins = [
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-];
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
-  : defaultDevOrigins;
+function isTrustedOrigin(origin: string, req: express.Request): boolean {
+  if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+    return true;
+  }
+  try {
+    const parsed = new URL(origin);
+    const originHost = parsed.host.toLowerCase();
+    const originHostname = parsed.hostname.toLowerCase();
+    const reqHost = (req.headers.host || '').toLowerCase();
+    const fwdHosts = String(req.headers['x-forwarded-host'] || '')
+      .split(',')
+      .map((h) => h.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (originHost === reqHost || fwdHosts.includes(originHost)) {
+      return true;
+    }
+
+    if (
+      originHostname.endsWith('.run.app') ||
+      originHostname.endsWith('.e2b.app') ||
+      originHostname.endsWith('.googleusercontent.com') ||
+      originHostname === 'aistudio.google.com'
+    ) {
+      return true;
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      if (originHostname === 'localhost' || originHostname === '127.0.0.1') {
+        return true;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
 
 // Standard security headers middleware for live cloud deployments
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'microphone=(self)');
   next();
 });
 
 app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. same-origin browser fetches, mobile clients, curl, server-to-server)
-      if (!origin) return callback(null, true);
-
-      // Explicit or default allowed origins
-      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      // In non-production/test environments, allow local test runners
-      if (process.env.NODE_ENV !== 'production') {
-        if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-          return callback(null, true);
-        }
-      }
-
-      return callback(new Error('Blocked by CORS policy'));
-    },
-    credentials: true,
+  cors((req, callback) => {
+    const origin = req.headers.origin;
+    // Allow requests with no origin (e.g. same-origin browser fetches, mobile clients, curl, server-to-server)
+    if (!origin || isTrustedOrigin(origin, req)) {
+      return callback(null, { origin: true, credentials: true });
+    }
+    return callback(null, { origin: false });
   })
 );
 
@@ -84,11 +102,14 @@ app.use('/api/', apiLimiter);
 const catalog = startCatalog();
 
 app.get('/api/health', async (_req, res) => {
-  res.json({
+  const catalogHealth = await catalog.health();
+  res.status(200).json({
     status: 'ok',
+    environment: process.env.NODE_ENV || 'development',
+    storageMode: catalogHealth.driver || 'fallback',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    catalog: await catalog.health(),
+    catalog: catalogHealth,
   });
 });
 
@@ -726,10 +747,10 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('/showcase*', (_req, res) => {
+    app.get(['/showcase', '/showcase/{*splat}'], (_req, res) => {
       res.sendFile(path.join(distPath, 'showcase.html'));
     });
-    app.get('*all', (_req, res) => {
+    app.get('{*splat}', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
