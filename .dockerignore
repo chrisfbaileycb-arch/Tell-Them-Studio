@@ -1,0 +1,11 @@
+node_modules
+dist
+test-results
+tests
+.git
+.github
+.env
+.env.local
+npm-debug.log*
+.DS_Store
+docs

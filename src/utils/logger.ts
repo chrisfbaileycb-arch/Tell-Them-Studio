@@ -39,7 +39,9 @@ const stripInlineData = (obj: any): any => {
  * @param params An object containing the parameters passed to the function.
  */
 export const logFunctionCall = (functionName: string, params: Record<string, any> = {}) => {
-  console.info(`[CALL] ${functionName}`, stripInlineData(params));
+  if (import.meta.env?.DEV) {
+    console.info(`[CALL] ${functionName}`, stripInlineData(params));
+  }
 };
 
 /**
@@ -50,9 +52,21 @@ export const logFunctionCall = (functionName: string, params: Record<string, any
  * @param output The output received from the model.
  */
 export const logGenAiCall = (model: string, prompt: any, config: any, output: any) => {
-  console.info(`[GENAI] Call to ${model}`, {
-    prompt: stripInlineData(prompt),
-    config: stripInlineData(config),
-    output: stripInlineData(output)
-  });
+  if (import.meta.env?.DEV) {
+    console.info(`[GENAI] Call to ${model}`, {
+      prompt: stripInlineData(prompt),
+      config: stripInlineData(config),
+      output: stripInlineData(output)
+    });
+  }
 };
+
+/**
+ * Logs a debug trace for a specific category, gated strictly by import.meta.env.DEV.
+ */
+export const logDebug = (category: string, ...args: any[]) => {
+  if (import.meta.env?.DEV) {
+    console.debug(`[${category}]`, ...args);
+  }
+};
+

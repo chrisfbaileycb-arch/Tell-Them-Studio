@@ -8,7 +8,7 @@
  * - Displaying clean lyrics without raw timestamp tags.
  * - Parsing timed lyrics for synchronized video rendering or karaoke-style displays.
  */
-import { logFunctionCall } from './logger';
+import { logFunctionCall, logDebug } from './logger';
 
 /**
  * Cleans raw lyrics by removing timestamp markers for standard display.
@@ -46,10 +46,10 @@ export const cleanLyricsForDisplay = (text: string): string => {
  */
 export const parseTimedLyrics = (lyricsStr: string): { time: number, text: string }[] => {
   logFunctionCall('parseTimedLyrics', { lyricsStrLength: lyricsStr?.length });
-  console.log('[Lyrics Debug] Raw lyrics string:', lyricsStr);
+  logDebug('Lyrics Debug', 'Raw lyrics string:', lyricsStr);
   
   if (!lyricsStr) {
-    console.log('[Lyrics Debug] Lyrics string is empty or undefined.');
+    logDebug('Lyrics Debug', 'Lyrics string is empty or undefined.');
     return [];
   }
 
@@ -72,7 +72,7 @@ export const parseTimedLyrics = (lyricsStr: string): { time: number, text: strin
       }
       currentTime = parseInt(match[1]) * 60 + parseInt(match[2]);
       currentText = match[3].trim();
-      console.log(`[Lyrics Debug] Found timestamp (m:ss): -> ${currentTime}s | Text: "${currentText}"`);
+      logDebug('Lyrics Debug', `Found timestamp (m:ss): -> ${currentTime}s | Text: "${currentText}"`);
       return;
     }
 
@@ -84,7 +84,7 @@ export const parseTimedLyrics = (lyricsStr: string): { time: number, text: strin
       }
       currentTime = parseFloat(match[1]);
       currentText = match[2].trim();
-      console.log(`[Lyrics Debug] Found timestamp ([ss.ss]): -> ${currentTime}s | Text: "${currentText}"`);
+      logDebug('Lyrics Debug', `Found timestamp ([ss.ss]): -> ${currentTime}s | Text: "${currentText}"`);
       return;
     }
 
@@ -96,7 +96,7 @@ export const parseTimedLyrics = (lyricsStr: string): { time: number, text: strin
       }
       if (currentTime !== -1) currentTime += 2; // Guess 2 seconds later
       currentText = match[1].trim();
-      console.log(`[Lyrics Debug] Found timestamp ([:]): -> ${currentTime}s | Text: "${currentText}"`);
+      logDebug('Lyrics Debug', `Found timestamp ([:]): -> ${currentTime}s | Text: "${currentText}"`);
       return;
     }
 
@@ -110,6 +110,6 @@ export const parseTimedLyrics = (lyricsStr: string): { time: number, text: strin
     parsed.push({ time: currentTime, text: currentText.trim() });
   }
 
-  console.log('[Lyrics Debug] Final parsed lyrics array:', parsed);
+  logDebug('Lyrics Debug', 'Final parsed lyrics array:', parsed);
   return parsed.sort((a, b) => a.time - b.time);
 };

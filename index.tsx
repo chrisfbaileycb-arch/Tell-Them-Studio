@@ -1,6 +1,6 @@
 
 /**
- * Entry point for the Lyria Studio React application.
+ * Entry point for the Tell Them Studio React application.
  * 
  * This file is responsible for bootstrapping the React application by
  * finding the root DOM element and rendering the main App component

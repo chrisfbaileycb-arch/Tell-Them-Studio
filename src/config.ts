@@ -1,16 +1,19 @@
 /**
  * Configuration Module for Tell Them Studio
  */
+import { MODELS } from './config/models';
+
+export { MODELS };
 
 export const CONFIG = {
-  MODEL_ID_3_5: "lyria-3-pro-preview",
-  MODEL_ID_3_PRO: "lyria-3-pro-preview",
-  MODEL_ID_3_CLIP: "lyria-3-clip-preview",
-  MODEL_ID_FULL: "lyria-3-pro-preview",
-  MODEL_ID_SHORT: "lyria-3-clip-preview",
-  IMAGE_MODEL: "gemini-3.1-flash-lite-image",
-  TEXT_MODEL: "gemini-3.8-flash",
-  TTS_MODEL: "gemini-3.8-flash-tts",
+  MODEL_ID_3_5: MODELS.MUSIC_FULL,
+  MODEL_ID_3_PRO: MODELS.MUSIC_FULL,
+  MODEL_ID_3_CLIP: MODELS.MUSIC_CLIP,
+  MODEL_ID_FULL: MODELS.MUSIC_FULL,
+  MODEL_ID_SHORT: MODELS.MUSIC_CLIP,
+  IMAGE_MODEL: MODELS.COVER_DEFAULT,
+  TEXT_MODEL: MODELS.TEXT_DEFAULT,
+  TTS_MODEL: MODELS.TTS_DEFAULT,
   MAX_SONG_DURATION_SECONDS: 230, // 3 minutes 50 seconds hard cutoff for any song
   MAX_SONG_DURATION_LABEL: "3:50",
   PODCAST_MIN_MINUTES: 5,

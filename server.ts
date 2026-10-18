@@ -1,10 +1,13 @@
 import { config as loadEnv } from 'dotenv';
 import express from 'express';
+import cors from 'cors';
+import { rateLimit } from 'express-rate-limit';
 import { CREATIVE_SYSTEM_INSTRUCTION, validateCreativeRequest } from './src/services/creativePolicy';
 import { GENRES, makeGenreSample, SampleGenre } from './src/utils/creativeAudio';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Modality, Type } from '@google/genai';
+import { MODELS } from './src/config/models';
 
 loadEnv({ path: '.env.local', quiet: true });
 loadEnv({ quiet: true });
@@ -12,7 +15,76 @@ const app = express();
 const portFlag = process.argv.indexOf('--port');
 const PORT = Number(process.env.PORT || (portFlag >= 0 ? process.argv[portFlag + 1] : 3000));
 
+const defaultDevOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+];
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : defaultDevOrigins;
+
+// Standard security headers middleware for live cloud deployments
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'microphone=(self)');
+  next();
+});
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. same-origin browser fetches, mobile clients, curl, server-to-server)
+      if (!origin) return callback(null, true);
+
+      // Explicit or default allowed origins
+      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // In non-production/test environments, allow local test runners
+      if (process.env.NODE_ENV !== 'production') {
+        if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+          return callback(null, true);
+        }
+      }
+
+      return callback(new Error('Blocked by CORS policy'));
+    },
+    credentials: true,
+  })
+);
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 150,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    error: 'Too many requests to Tell Them Studio API. Please slow down and try again later.',
+  },
+});
+
+app.use('/api/', apiLimiter);
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use(express.json({ limit: '50mb' }));
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return typeof error === 'string' ? error : 'Internal Server Error';
+}
 
 function resolveServerApiKey(): string | undefined {
   loadEnv({ path: '.env.local', quiet: true });
@@ -55,9 +127,9 @@ function detectGenreFromPrompt(promptText: string): SampleGenre {
 
 async function generateTextWithFallback(ai: GoogleGenAI, prompt: string, config?: any) {
   const modelsToTry = Array.from(
-    new Set([process.env.TEXT_MODEL, 'gemini-3.8-flash', 'gemini-2.5-flash'].filter(Boolean) as string[])
+    new Set([process.env.TEXT_MODEL, MODELS.TEXT_DEFAULT, MODELS.TEXT_FALLBACK].filter(Boolean) as string[])
   );
-  let lastError: any;
+  let lastError: unknown;
   for (const model of modelsToTry) {
     try {
       return await ai.models.generateContent({
@@ -65,11 +137,11 @@ async function generateTextWithFallback(ai: GoogleGenAI, prompt: string, config?
         contents: prompt,
         ...(config ? { config } : {}),
       });
-    } catch (err) {
+    } catch (err: unknown) {
       lastError = err;
     }
   }
-  throw lastError;
+  throw lastError instanceof Error ? lastError : new Error(getErrorMessage(lastError));
 }
 
 async function synthesizeStudioFallbackTrack(
@@ -100,7 +172,8 @@ async function synthesizeStudioFallbackTrack(
         `Write original, uplifting, radio-safe song lyrics for this music request: "${promptText}". Include clear section markers like [Verse 1], [Chorus], [Verse 2], [Bridge]. Return ONLY the lyrics.`
       );
       lyricsText = lyricRes.text?.trim() || '';
-    } catch {
+    } catch (error: unknown) {
+      console.warn('Lyric generation fallback triggered:', getErrorMessage(error));
       lyricsText = '';
     }
   }
@@ -127,14 +200,14 @@ app.post('/api/creative-assistant', async (req, res) => {
     const parts: any[] = [{ text: `Task: ${task}. Creative direction: ${genre}.\n${message}` }];
     if (audio) parts.push({ inlineData: { data: audio.data, mimeType: audio.mimeType } });
     const response = await getAiClient().models.generateContent({
-      model: process.env.CREATIVE_MODEL || 'gemini-3.8-flash',
+      model: process.env.CREATIVE_MODEL || MODELS.CREATIVE_DEFAULT,
       contents: [...history.map((m: any) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.text }] })), { role: 'user', parts }],
       config: { systemInstruction: CREATIVE_SYSTEM_INSTRUCTION, maxOutputTokens: 2400, httpOptions: { timeout: 60000 } },
     });
     if (!response.text?.trim()) return res.status(502).json({ error: 'The assistant returned no response. Try a shorter or different brief.' });
     res.json({ text: response.text.trim() });
-  } catch (error) {
-    console.warn('Creative assistant warning:', error instanceof Error ? error.message : error);
+  } catch (error: unknown) {
+    console.warn('Creative assistant warning:', getErrorMessage(error));
     res.status(502).json({ error: 'The AI service could not complete this request. Check the configured model and provider access, then try again.' });
   }
 });
@@ -150,8 +223,8 @@ app.post('/api/generate-title', async (req, res) => {
     if (cleaned) {
       return res.json({ title: cleaned });
     }
-  } catch (error: any) {
-    console.warn('Using fallback song title:', error?.message || error);
+  } catch (error: unknown) {
+    console.warn('Using fallback song title:', getErrorMessage(error));
   }
   const stopWords = new Set(['create', 'make', 'song', 'track', 'music', 'with', 'about', 'that', 'this', 'from', 'the', 'and', 'for', 'our', 'your', 'original', 'upbeat', 'short', 'clip']);
   const words = `${musicPrompt} ${lyricContext}`
@@ -170,7 +243,7 @@ app.post('/api/generate-cover', async (req, res) => {
     const ai = getAiClient();
     const imagePrompt = `A high-quality, professional square album cover picture that coincides directly with the song titled "${title || 'Studio Session'}" (${genre || 'Original Music'}). Visual story & atmosphere from the song: ${musicPrompt}. Lyric imagery: ${(lyricContext || '').substring(0, 240)}. Editorial studio photography and graphic art aesthetic. IMPORTANT: Ignore any mention of BPM or musical scale in the prompt; do NOT print any numbers, BPM, or scale text on the image.`;
     const response = await ai.models.generateContent({
-      model: process.env.COVER_MODEL || 'gemini-3.1-flash-lite-image',
+      model: process.env.COVER_MODEL || MODELS.COVER_DEFAULT,
       contents: { parts: [{ text: imagePrompt }] },
       config: {
         imageConfig: { aspectRatio: '1:1' },
@@ -186,9 +259,10 @@ app.post('/api/generate-cover', async (req, res) => {
       }
     }
     res.json({ coverImageUrl: base64Image });
-  } catch (error: any) {
-    console.warn('Using studio vector cover art fallback:', error?.message || error);
-    res.json({ coverImageUrl: null, warning: error?.message });
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error);
+    console.warn('Using studio vector cover art fallback:', errorMsg);
+    res.json({ coverImageUrl: null, warning: errorMsg });
   }
 });
 
@@ -258,8 +332,8 @@ app.post('/api/generate-music', async (req, res) => {
         }
 
         if (audioAccumulator) break;
-      } catch (lyriaErr: any) {
-        console.warn(`Lyria model (${modelId}) unavailable or quota reached, trying next option...`);
+      } catch (lyriaErr: unknown) {
+        console.warn(`Lyria model (${modelId}) unavailable or quota reached (${getErrorMessage(lyriaErr)}), trying next option...`);
       }
     }
 
@@ -273,13 +347,13 @@ app.post('/api/generate-music', async (req, res) => {
 
     const fallback = await synthesizeStudioFallbackTrack(ai, promptText, Boolean(isClip));
     return res.json(fallback);
-  } catch (error: any) {
-    console.warn('Music generation fell back to studio synthesizer:', error?.message || error);
+  } catch (error: unknown) {
+    console.warn('Music generation fell back to studio synthesizer:', getErrorMessage(error));
     try {
       const fallback = await synthesizeStudioFallbackTrack(ai, promptText, Boolean(isClip));
       return res.json(fallback);
-    } catch (innerErr: any) {
-      return res.status(500).json({ error: innerErr?.message || 'Music synthesis failed.' });
+    } catch (innerErr: unknown) {
+      return res.status(500).json({ error: getErrorMessage(innerErr) || 'Music synthesis failed.' });
     }
   }
 });
@@ -351,7 +425,8 @@ Return JSON with:
         },
       });
       parsed = JSON.parse(scriptResponse.text || '{}');
-    } catch {
+    } catch (error: unknown) {
+      console.warn('Podcast script generation fallback triggered:', getErrorMessage(error));
       parsed = {
         episodeTitle: `${showTitle}: ${episodeTopic}`,
         showNotes: `An uplifting ${targetMinutes}-minute studio conversation between ${hostAName} and ${hostBName} exploring ${episodeTopic}.`,
@@ -376,7 +451,7 @@ Return JSON with:
     let audioBase64: string | null = null;
     let mimeType = 'audio/wav';
     const ttsModels = Array.from(
-      new Set([process.env.TTS_MODEL, 'gemini-3.8-flash-tts', 'gemini-2.5-flash-preview-tts'].filter(Boolean) as string[])
+      new Set([process.env.TTS_MODEL, MODELS.TTS_DEFAULT, ...MODELS.TTS_FALLBACKS].filter(Boolean) as string[])
     );
 
     for (const ttsModel of ttsModels) {
@@ -408,8 +483,8 @@ Return JSON with:
           mimeType = inline.mimeType || 'audio/wav';
           break;
         }
-      } catch (ttsErr: any) {
-        console.warn(`TTS model (${ttsModel}) unavailable or quota reached, trying next...`);
+      } catch (ttsErr: unknown) {
+        console.warn(`TTS model (${ttsModel}) unavailable or quota reached (${getErrorMessage(ttsErr)}), trying next...`);
       }
     }
 
@@ -427,8 +502,8 @@ Return JSON with:
       audioBase64,
       mimeType,
     });
-  } catch (error: any) {
-    console.warn('Podcast synthesis fallback triggered:', error?.message || error);
+  } catch (error: unknown) {
+    console.warn('Podcast synthesis fallback triggered:', getErrorMessage(error));
     const wavBlob = makeGenreSample('Jazz', 0);
     const audioBase64 = Buffer.from(await wavBlob.arrayBuffer()).toString('base64');
     res.json({
@@ -517,7 +592,8 @@ Return JSON with:
         },
       });
       parsed = JSON.parse(copyResponse.text || '{}');
-    } catch {
+    } catch (error: unknown) {
+      console.warn('Commercial copy generation fallback triggered:', getErrorMessage(error));
       parsed = {
         campaignTitle: `${brandName} Spotlight`,
         tagline: `${brandName} — Crafted for You`,
@@ -535,7 +611,7 @@ Return JSON with:
     let audioBase64: string | null = null;
     let mimeType = 'audio/wav';
     const ttsModels = Array.from(
-      new Set([process.env.TTS_MODEL, 'gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts', 'gemini-2.5-flash-preview-tts'].filter(Boolean) as string[])
+      new Set([process.env.TTS_MODEL, MODELS.TTS_DEFAULT, ...MODELS.TTS_FALLBACKS].filter(Boolean) as string[])
     );
 
     for (const ttsModel of ttsModels) {
@@ -567,8 +643,8 @@ Return JSON with:
           mimeType = inline.mimeType || 'audio/wav';
           break;
         }
-      } catch (ttsErr: any) {
-        console.warn(`Commercial TTS (${ttsModel}) unavailable or quota reached, trying next...`);
+      } catch (ttsErr: unknown) {
+        console.warn(`Commercial TTS (${ttsModel}) unavailable or quota reached (${getErrorMessage(ttsErr)}), trying next...`);
       }
     }
 
@@ -583,8 +659,8 @@ Return JSON with:
       audioBase64,
       mimeType,
     });
-  } catch (error: any) {
-    console.warn('Commercial synthesis fallback triggered:', error?.message || error);
+  } catch (error: unknown) {
+    console.warn('Commercial synthesis fallback triggered:', getErrorMessage(error));
     const wavBlob = makeGenreSample('Pop Band', 0);
     const audioBase64 = Buffer.from(await wavBlob.arrayBuffer()).toString('base64');
     res.json({
@@ -615,9 +691,24 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Tell Them Studio server running on http://localhost:${PORT}`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Tell Them Studio server listening on 0.0.0.0:${PORT} (${process.env.NODE_ENV || 'development'} mode)`);
   });
+
+  const shutdown = (signal: string) => {
+    console.log(`Received ${signal}. Shutting down Tell Them Studio gracefully...`);
+    server.close(() => {
+      console.log('HTTP server closed.');
+      process.exit(0);
+    });
+    setTimeout(() => {
+      console.error('Forced termination after shutdown timeout.');
+      process.exit(1);
+    }, 10000).unref();
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 startServer();
