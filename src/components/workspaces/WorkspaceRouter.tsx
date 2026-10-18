@@ -30,6 +30,7 @@ export const WorkspaceRouter: React.FC<WorkspaceRouterProps> = ({
       {activeTab === 'listen' && (
         <PublicCommunityShowcase
           feed={studio.communityFeed}
+          feedSource={studio.communityFeedSource}
           activeTrack={playback.persistentTrack}
           isPlaying={playback.persistentPlaying}
           currentTime={playback.persistentTime}

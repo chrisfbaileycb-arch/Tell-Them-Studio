@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   BandArchetype,
   CommunityFeedItem,
@@ -43,8 +43,21 @@ import {
   createCommunityFeedItemFromResult,
   hydrateCommunityFeedAudio,
   loadCommunityFeedSync,
+  mergeCommunityFeeds,
+  saveCatalogCache,
   saveCommunityFeedSync,
 } from '../utils/communityFeed';
+import {
+  blobToBase64,
+  fetchMyCreations,
+  fetchPublishedCreations,
+  isOk,
+  setCreationPublished,
+  uploadCreation,
+} from '../utils/catalogClient';
+import { getCatalogSession, getCatalogState } from '../utils/catalogSession';
+import { announceCreatorHandle } from '../utils/creatorHandle';
+import type { PublicCreation } from '../types/community';
 import { useDraft } from './useDraft';
 
 export function useStudioState(setActiveTab: (tab: StudioTab) => void) {
@@ -63,6 +76,7 @@ export function useStudioState(setActiveTab: (tab: StudioTab) => void) {
     } catch {
       /* Browser privacy mode may disable persistence. */
     }
+    announceCreatorHandle(creatorHandle);
   }, [creatorHandle]);
 
   const [isEditingHandle, setIsEditingHandle] = useState(false);
@@ -162,15 +176,67 @@ export function useStudioState(setActiveTab: (tab: StudioTab) => void) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Public Community Showcase Feed
-  const [communityFeed, setCommunityFeed] = useState<CommunityFeedItem[]>(() => loadCommunityFeedSync());
+  // Public Community Showcase Feed.
+  // `localFeed` is what this browser published (plus bundled demo seeds) and is persisted as
+  // before. `remoteCatalog` is the live catalog; `communityFeed` is the merged view shown in the UI.
+  const [localFeed, setLocalFeed] = useState<CommunityFeedItem[]>(() => loadCommunityFeedSync());
+  const [remoteCatalog, setRemoteCatalog] = useState<{ items: PublicCreation[] | null; ownRefs: Map<string, string> }>(
+    () => ({ items: null, ownRefs: new Map() })
+  );
   const [communityNotice, setCommunityNotice] = useState<string | null>(null);
+  const merged = useMemo(
+    () => mergeCommunityFeeds(localFeed, remoteCatalog.items, remoteCatalog.ownRefs),
+    [localFeed, remoteCatalog]
+  );
+  const communityFeed = merged.feed;
+  const communityFeedSource = merged.source;
+
+  const creatorHandleRef = useRef(creatorHandle);
+  creatorHandleRef.current = creatorHandle;
+
+  /** Cache-and-network: a failed fetch keeps whatever was last known (cache, else demo seeds). */
+  const refreshCommunityCatalog = async () => {
+    const published = await fetchPublishedCreations();
+    if (!isOk(published)) return;
+    saveCatalogCache(published.data);
+    const ownRefs = new Map<string, string>();
+    const session = getCatalogState();
+    if (session.status === 'online' && session.handle === creatorHandleRef.current) {
+      const mine = await fetchMyCreations();
+      if (isOk(mine)) {
+        mine.data.forEach((c) => {
+          if (c.clientRef) ownRefs.set(c.id, c.clientRef);
+        });
+      }
+    }
+    setRemoteCatalog({ items: published.data, ownRefs });
+  };
 
   useEffect(() => {
-    hydrateCommunityFeedAudio(communityFeed).then((hydrated) => {
-      setCommunityFeed(hydrated);
+    hydrateCommunityFeedAudio(localFeed).then((hydrated) => {
+      // Merge by id so an item published while hydration was running is not clobbered.
+      setLocalFeed((prev) => prev.map((item) => hydrated.find((h) => h.id === item.id) ?? item));
     });
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      await refreshCommunityCatalog();
+      // Once the creator session is known we can also de-duplicate our own uploads.
+      const session = await getCatalogSession(creatorHandle);
+      if (!cancelled && isOk(session)) await refreshCommunityCatalog();
+    };
+    void run();
+    const onOnline = () => {
+      void run();
+    };
+    window.addEventListener('online', onOnline);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('online', onOnline);
+    };
+  }, [creatorHandle]);
 
   // Initialize playable preview WAVs on seeded community songs
   useEffect(() => {
@@ -277,12 +343,84 @@ export function useStudioState(setActiveTab: (tab: StudioTab) => void) {
         ? `Narrators: ${podcastHostA} (${podcastHostAVoice}) & ${podcastHostB} (${podcastHostBVoice})`
         : undefined;
     const feedItem = await createCommunityFeedItemFromResult(result, narratorLabel);
-    setCommunityFeed((prev) => {
+    // Local-first: the item is visible immediately, whether or not the live catalog is reachable.
+    setLocalFeed((prev) => {
       const updated = [feedItem, ...prev.filter((item) => item.id !== feedItem.id)];
       saveCommunityFeedSync(updated);
       return updated;
     });
     setCommunityNotice(`Published "${feedItem.title}" to the Public Community Showcase!`);
+    void promoteToLiveCatalog(result, feedItem);
+  };
+
+  /**
+   * Best-effort: mirror a locally published item into the durable catalog. The server owns the
+   * publication decision (moderation, rate limits), so a rejection here retracts the local item.
+   */
+  const promoteToLiveCatalog = async (result: SongResult, feedItem: CommunityFeedItem) => {
+    const localOnly = (why: string) =>
+      setCommunityNotice(`Published "${feedItem.title}" on this device. ${why}`);
+    try {
+      if (result.creatorHandle !== creatorHandle) {
+        return localOnly('Sign in with the handle that created it to share it with everyone.');
+      }
+      const session = await getCatalogSession(creatorHandle);
+      if (!isOk(session)) {
+        if (session.reason === 'conflict' || session.reason === 'invalid' || session.code === 'reserved_handle') {
+          return localOnly('Choose your own handle (Change Handle) to share it through the live catalog.');
+        }
+        return; // Catalog offline/unavailable: local publish stands, with no extra noise.
+      }
+      if (!result.audioUrl) return;
+      const audio = await (await fetch(result.audioUrl)).blob();
+      const created = await uploadCreation({
+        title: feedItem.title,
+        genre: feedItem.genre,
+        lyrics: feedItem.lyrics,
+        kind: feedItem.type,
+        provenance:
+          result.originType && result.originType !== 'Craft Commercial Spot'
+            ? result.originType
+            : feedItem.type === 'podcast'
+              ? 'AI Multi-Host Podcast'
+              : 'AI-Generated Material',
+        durationLabel: feedItem.durationLabel,
+        vocalArrangement: feedItem.vocalArrangement,
+        narratorInfo: feedItem.narratorInfo,
+        clientRef: result.id,
+        audioBase64: await blobToBase64(audio),
+        mimeType: audio.type || undefined,
+      });
+      if (!isOk(created)) {
+        if (created.reason === 'rejected') return retractLocalPublish(feedItem, created.flagReason || created.message);
+        return localOnly('It will be shared when the live catalog is reachable.');
+      }
+      const published = await setCreationPublished(created.data.creation.id, true);
+      if (!isOk(published)) {
+        if (published.reason === 'rejected') return retractLocalPublish(feedItem, published.flagReason || published.message);
+        return localOnly('It will be shared when the live catalog is reachable.');
+      }
+      setLocalFeed((prev) => {
+        const updated = prev.map((item) =>
+          item.id === feedItem.id ? { ...item, remoteId: created.data.creation.id } : item
+        );
+        saveCommunityFeedSync(updated);
+        return updated;
+      });
+      setCommunityNotice(`Published "${feedItem.title}" to the live Public Community Showcase!`);
+      void refreshCommunityCatalog();
+    } catch {
+      /* Network/blob problems never undo the local publish. */
+    }
+  };
+
+  const retractLocalPublish = (feedItem: CommunityFeedItem, reason: string) => {
+    setLocalFeed((prev) => {
+      const updated = prev.filter((item) => item.id !== feedItem.id);
+      saveCommunityFeedSync(updated);
+      return updated;
+    });
+    setCommunityNotice(`"${feedItem.title}" was not published: ${reason}`);
   };
 
   const handleGenerate = async (overrides?: {
@@ -961,6 +1099,7 @@ export function useStudioState(setActiveTab: (tab: StudioTab) => void) {
     setActiveSelector,
     fileInputRef,
     communityFeed,
+    communityFeedSource,
     communityNotice,
     setCommunityNotice,
     handleSelectBandArchetype,

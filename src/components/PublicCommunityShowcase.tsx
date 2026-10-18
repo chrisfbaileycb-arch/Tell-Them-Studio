@@ -22,6 +22,14 @@ import {
   describeSongPictureTheme,
 } from '../../constants';
 import { cleanLyricsForDisplay } from '../utils/lyricsUtils';
+import { ReportButton } from './ReportButton';
+
+const RemixCredit: React.FC<{ item: CommunityFeedItem }> = ({ item }) =>
+  item.remixOf ? (
+    <p data-testid="remix-credit" className="text-[11px] font-semibold text-gray-600">
+      Remix of <span className="font-mono text-blue-600">{item.remixOf.creatorHandle}</span> &mdash; {item.remixOf.title}
+    </p>
+  ) : null;
 
 const MUSIC_GENRE_FILTERS = [
   'All',
@@ -67,6 +75,8 @@ interface PublicCommunityShowcaseProps {
   duration: number;
   onPlayTrack: (track: CommunityFeedItem) => void;
   onSeekTrack: (track: CommunityFeedItem, timeSec: number) => void;
+  /** Where the feed came from; omitted for callers that do not care. */
+  feedSource?: 'catalog' | 'cache' | 'demo';
 }
 
 export const PublicCommunityShowcase: React.FC<PublicCommunityShowcaseProps> = ({
@@ -77,6 +87,7 @@ export const PublicCommunityShowcase: React.FC<PublicCommunityShowcaseProps> = (
   duration,
   onPlayTrack,
   onSeekTrack,
+  feedSource,
 }) => {
   const [showcaseMode, setShowcaseMode] = useState<'music' | 'podcast'>('music');
   const [selectedGenre, setSelectedGenre] = useState<string>('All');
@@ -129,6 +140,15 @@ export const PublicCommunityShowcase: React.FC<PublicCommunityShowcaseProps> = (
           <p className="text-sm text-gray-500">
             Listen to published community music tracks and multi-host podcast episodes right in the studio player. Commercials are excluded from this feed.
           </p>
+          {feedSource && (
+            <p data-testid="feed-source" data-feed-source={feedSource} className="text-xs text-gray-500">
+              {feedSource === 'catalog'
+                ? 'Showing the live community catalog.'
+                : feedSource === 'cache'
+                  ? 'Live catalog unreachable — showing the last catalog contents saved on this device.'
+                  : 'Showing bundled demo tracks and what you published on this device.'}
+            </p>
+          )}
         </div>
 
         {/* Music vs. Podcasts Toggle */}
@@ -307,6 +327,7 @@ export const PublicCommunityShowcase: React.FC<PublicCommunityShowcaseProps> = (
                           <h3 className="text-base font-bold text-gray-900 leading-snug break-words">
                             {track.title}
                           </h3>
+                          <RemixCredit item={track} />
                         </div>
 
                         {track.lyrics && (
@@ -326,6 +347,9 @@ export const PublicCommunityShowcase: React.FC<PublicCommunityShowcaseProps> = (
                               </pre>
                             )}
                           </div>
+                        )}
+                        {track.fromCatalog && track.remoteId && (
+                          <ReportButton creationId={track.remoteId} title={track.title} />
                         )}
                       </div>
                     </div>
@@ -432,6 +456,7 @@ export const PublicCommunityShowcase: React.FC<PublicCommunityShowcaseProps> = (
                           <h3 className="text-lg font-bold text-gray-900 leading-snug">
                             {ep.title}
                           </h3>
+                          <RemixCredit item={ep} />
                           <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700">
                             <UserCheck size={14} className="text-blue-600 shrink-0" />
                             <span>{ep.narratorInfo || 'Narrators: Alex (Puck) & Sam (Kore)'}</span>
@@ -497,6 +522,7 @@ export const PublicCommunityShowcase: React.FC<PublicCommunityShowcaseProps> = (
                           </span>
                         </div>
                       </div>
+                      {ep.fromCatalog && ep.remoteId && <ReportButton creationId={ep.remoteId} title={ep.title} />}
                     </div>
                   </article>
                 );

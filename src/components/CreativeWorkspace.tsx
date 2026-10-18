@@ -21,27 +21,86 @@ import {
 } from "../utils/creativeAudio";
 import {
   LibraryTrack,
+  SyncPatch,
+  commitSyncPatch,
   loadLibrary,
+  revokeRemoteCopy,
   saveTrack,
   deleteTrack,
+  syncLibrary,
+  syncTrackToCatalog,
+  undoWithdrawal,
+  withdrawConsent,
+  type ConsentResult,
 } from "../utils/libraryStore";
+import { subscribeCreatorHandle } from "../utils/creatorHandle";
 import { handleDownloadVideo } from "../utils/videoUtils";
+import { DistributionPanel } from "./DistributionPanel";
 import "./creative.css";
 
 type LibraryContextValue = {
   tracks: LibraryTrack[];
   put: (track: LibraryTrack) => Promise<void>;
   remove: (id: string) => Promise<void>;
+  /** Withdraws consent on the server (cascading to remixes) and refreshes local state. */
+  withdraw: (track: LibraryTrack, mode: "soft" | "hard") => Promise<ConsentResult>;
+  undoWithdraw: (track: LibraryTrack) => Promise<ConsentResult>;
   error: string;
 };
 const LibraryContext = createContext<LibraryContextValue>(null!);
+const SYNC_FIELDS = [
+  "remoteId",
+  "remoteSignature",
+  "remotePublished",
+  "syncState",
+  "syncMessage",
+  "syncFailedKey",
+  "moderationHold",
+  "remoteRemixPermitted",
+] as const;
+const patchChangesTrack = (t: LibraryTrack, patch: SyncPatch) =>
+  SYNC_FIELDS.some((k) => t[k] !== patch[k]);
+
 export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const [tracks, setTracks] = useState<LibraryTrack[]>([]),
     [error, setError] = useState("");
+  const tracksRef = useRef(tracks);
+  tracksRef.current = tracks;
+  const mounted = useRef(true);
+  // Network work is serialised so overlapping edits cannot interleave their uploads.
+  const syncChain = useRef<Promise<unknown>>(Promise.resolve());
+  const enqueue = (job: () => Promise<void>) => {
+    syncChain.current = syncChain.current.then(job).catch(() => undefined);
+  };
+  const syncOne = (track: LibraryTrack) =>
+    enqueue(async () => {
+      const patch = await syncTrackToCatalog(track);
+      if (!patch || !patchChangesTrack(track, patch)) return;
+      const saved = await commitSyncPatch(track.id, patch);
+      if (saved && mounted.current)
+        setTracks((old) => old.map((t) => (t.id === track.id ? { ...t, ...patch } : t)));
+    });
+  const syncAll = () =>
+    enqueue(async () => {
+      const merged = await syncLibrary();
+      if (mounted.current) setTracks(merged);
+    });
   useEffect(() => {
+    mounted.current = true;
     loadLibrary()
-      .then(setTracks)
+      .then((local) => {
+        setTracks(local);
+        syncAll();
+      })
       .catch((e) => setError(e.message));
+    // Re-sync when the creator picks a different handle or the network returns.
+    const stopHandle = subscribeCreatorHandle(syncAll);
+    window.addEventListener("online", syncAll);
+    return () => {
+      mounted.current = false;
+      stopHandle();
+      window.removeEventListener("online", syncAll);
+    };
   }, []);
   const put = async (track: LibraryTrack) => {
     // Reflect edits immediately; roll back to durable storage if a write fails.
@@ -56,13 +115,31 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       }
       throw e;
     }
+    // Local save succeeded; mirroring to the live catalog is best-effort in the background.
+    syncOne(track);
   };
   const remove = async (id: string) => {
+    const track = tracksRef.current.find((t) => t.id === id);
     await deleteTrack(id);
     setTracks((old) => old.filter((t) => t.id !== id));
+    if (track?.remoteId) enqueue(async () => void (await revokeRemoteCopy(track)));
   };
+  // Consent changes are awaited by the caller but still serialised with pending syncs.
+  const runConsent = (job: () => Promise<ConsentResult>) =>
+    new Promise<ConsentResult>((resolve) => {
+      enqueue(async () => {
+        const result = await job().catch(
+          () => ({ ok: false, message: "The community service could not be reached." }) as ConsentResult,
+        );
+        if (mounted.current) setTracks(await loadLibrary().catch(() => tracksRef.current));
+        resolve(result);
+      });
+    });
+  const withdraw = (track: LibraryTrack, mode: "soft" | "hard") =>
+    runConsent(() => withdrawConsent(track, mode));
+  const undoWithdraw = (track: LibraryTrack) => runConsent(() => undoWithdrawal(track));
   return (
-    <LibraryContext.Provider value={{ tracks, put, remove, error }}>
+    <LibraryContext.Provider value={{ tracks, put, remove, withdraw, undoWithdraw, error }}>
       {children}
     </LibraryContext.Provider>
   );
@@ -97,6 +174,12 @@ function Player({ audio }: { audio: Blob }) {
     />
   );
 }
+const SYNC_LABELS: Record<string, string> = {
+  synced: "Synced",
+  pending: "Sync pending",
+  failed: "Not published",
+  local: "Local only",
+};
 const makeTrack = (
   title: string,
   genre: string,
@@ -175,6 +258,11 @@ export function SaveCreations({
                       ? "commercial"
                       : "music",
                 lyrics: result.lyrics,
+                provenance:
+                  result.originType &&
+                  result.originType !== "Craft Commercial Spot"
+                    ? result.originType
+                    : undefined,
                 coverImageUrl:
                   result.coverImageUrl ||
                   createUniqueSongArtworkSvg({
@@ -432,7 +520,7 @@ export function CreativeWorkspace({
   onPodcast: () => void;
   onLyrics: (lyrics: string) => void;
 }) {
-  const { tracks, put, remove, error } = useLibrary();
+  const { tracks, put, remove, withdraw, undoWithdraw, error } = useLibrary();
   const [genre, setGenre] = useState<SampleGenre>("Rock Band"),
     [filter, setFilter] = useState("All"),
     [notice, setNotice] = useState("");
@@ -745,7 +833,7 @@ export function CreativeWorkspace({
               </h2>
               <p>
                 {mode === "listen"
-                  ? "Only explicitly public items appear here. This catalog is local to this browser; global sharing and creator interactions need a backend. Public listening never grants remix permission."
+                  ? "Only explicitly public items appear here. This list shows this browser’s library; with your own handle, public items also sync to the live community catalog above. Public listening never grants remix permission."
                   : "Rename, organize, export, or delete your work. Public and remix permissions are separate."}
               </p>
             </div>
@@ -816,6 +904,20 @@ export function CreativeWorkspace({
                     : "Public (local preview)"}{" "}
                   · {t.remixAllowed ? "Remix permitted" : "Listening only"}
                 </p>
+                {t.syncState && (
+                  <p
+                    data-testid="library-sync-status"
+                    data-sync-state={t.syncState}
+                    className="text-xs text-gray-500"
+                  >
+                    {t.moderationHold
+                      ? "Awaiting review"
+                      : t.consentWithdrawnAt
+                        ? "Consent withdrawn"
+                        : SYNC_LABELS[t.syncState] || t.syncState}
+                    {t.syncMessage ? ` · ${t.syncMessage}` : ""}
+                  </p>
+                )}
                 <Player audio={t.audio} />
                 {mode === "listen" ? (
                   <button
@@ -870,6 +972,7 @@ export function CreativeWorkspace({
                     <label className="cw-check">
                       <input
                         type="checkbox"
+                        disabled={Boolean(t.consentWithdrawnAt)}
                         checked={t.visibility === "public"}
                         onChange={async (e) => {
                           try {
@@ -892,7 +995,7 @@ export function CreativeWorkspace({
                     <label className="cw-check">
                       <input
                         type="checkbox"
-                        disabled={t.visibility !== "public"}
+                        disabled={t.visibility !== "public" || Boolean(t.consentWithdrawnAt)}
                         checked={t.remixAllowed}
                         onChange={async (e) => {
                           try {
@@ -970,6 +1073,51 @@ export function CreativeWorkspace({
                       >
                         Delete
                       </button>
+                      {t.remoteId && !t.consentWithdrawnAt && (
+                        <>
+                          <button
+                            data-testid="withdraw-consent"
+                            onClick={async () => {
+                              if (
+                                !window.confirm(
+                                  `Withdraw consent for “${t.title}”? It and every remix of it will disappear from the live catalog. You can undo this during the grace period.`,
+                                )
+                              )
+                                return;
+                              const r = await withdraw(t, "soft");
+                              setNotice(r.message);
+                            }}
+                          >
+                            Withdraw consent
+                          </button>
+                          <button
+                            data-testid="erase-from-catalog"
+                            onClick={async () => {
+                              if (
+                                !window.confirm(
+                                  `Erase “${t.title}” from the live catalog permanently? Audio for it and all of its remixes is deleted immediately and cannot be restored.`,
+                                )
+                              )
+                                return;
+                              const r = await withdraw(t, "hard");
+                              setNotice(r.message);
+                            }}
+                          >
+                            Erase from catalog
+                          </button>
+                        </>
+                      )}
+                      {t.consentWithdrawnAt && t.consentWithdrawnBecause === "owner" && (
+                        <button
+                          data-testid="undo-withdrawal"
+                          onClick={async () => {
+                            const r = await undoWithdraw(t);
+                            setNotice(r.message);
+                          }}
+                        >
+                          Undo withdrawal
+                        </button>
+                      )}
                     </div>
                   </>
                 )}
@@ -979,6 +1127,7 @@ export function CreativeWorkspace({
           </div>
         </section>
       )}
+      {mode === "library" && <DistributionPanel owner={owner} tracks={mine} />}
       {mode === "creative" && (
         <>
           <div className="cw-chips">

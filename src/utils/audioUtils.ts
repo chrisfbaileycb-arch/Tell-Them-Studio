@@ -111,45 +111,6 @@ export const createStudioPreviewWavUrl = (style: 'rock' | 'disco' = 'rock'): str
 /**
  * Checks community praise, comments, and prompts against Tell Them Studio's
  * Kindness-First, Family-Safe (PG), and Royalty/Trademark Respect standards.
+ * The implementation lives in a DOM-free module so server moderation shares it.
  */
-export const validateKindnessAndSafety = (
-  text: string
-): { valid: boolean; reason?: string; suggestion?: string } => {
-  const lower = text.toLowerCase();
-  const unkindWords = [
-    'trash',
-    'garbage',
-    'terrible',
-    'horrible',
-    'stupid',
-    'awful',
-    'sucks',
-    'hate you',
-    'worst',
-    'ugly',
-    'shut up',
-    'idiot',
-    'loser',
-  ];
-  for (const w of unkindWords) {
-    if (lower.includes(w)) {
-      return {
-        valid: false,
-        reason:
-          'Tell Them Studio is a 100% supportive, kindness-first creation community. Put-downs and negative remarks are not permitted.',
-        suggestion: 'Try sharing constructive encouragement, a question about their arrangement, or a specific musical compliment!',
-      };
-    }
-  }
-
-  // Personal contact data check (handles only, no phone numbers or emails in public comments)
-  if (/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/.test(text) || /\S+@\S+\.\S+/.test(text)) {
-    return {
-      valid: false,
-      reason:
-        'For creator safety, all connections happen exclusively under studio handles (@handle). Please do not share personal phone numbers or email addresses.',
-    };
-  }
-
-  return { valid: true };
-};
+export { validateKindnessAndSafety } from '../services/contentSafety';

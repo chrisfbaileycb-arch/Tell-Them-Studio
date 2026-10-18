@@ -9,3 +9,4 @@ tests
 npm-debug.log*
 .DS_Store
 docs
+.data

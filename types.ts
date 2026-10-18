@@ -209,5 +209,11 @@ export interface CommunityFeedItem {
   durationLabel?: string;
   coverImageUrl?: string;
   vocalArrangement?: string;
+  /** Server-side creation id when this item is backed by the live catalog. */
+  remoteId?: string;
+  /** True when the item came from the live catalog (vs. bundled demo / local-only publish). */
+  fromCatalog?: boolean;
+  /** Mandatory attribution when this item is a remix of another creator's project. */
+  remixOf?: { id: string; title: string; creatorHandle: string };
 }
 

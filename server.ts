@@ -8,6 +8,8 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Modality, Type } from '@google/genai';
 import { MODELS } from './src/config/models';
+import { startCatalog } from './src/server/catalog/factory';
+import { catalogErrorHandler, createCatalogRouter } from './src/server/routes/catalogRoutes';
 
 loadEnv({ path: '.env.local', quiet: true });
 loadEnv({ quiet: true });
@@ -59,9 +61,14 @@ app.use(
   })
 );
 
+function envNumber(name: string): number | undefined {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 150,
+  limit: envNumber('API_RATE_LIMIT') ?? 150,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: {
@@ -71,15 +78,42 @@ const apiLimiter = rateLimit({
 
 app.use('/api/', apiLimiter);
 
-app.get('/api/health', (_req, res) => {
+// Durable community catalog (creator sessions, creations, object storage). Startup is lazy and
+// failure-tolerant: when unconfigured or unavailable every catalog route answers 503 and the
+// client keeps working in its local-only fallback mode.
+const catalog = startCatalog();
+
+app.get('/api/health', async (_req, res) => {
   res.json({
     status: 'ok',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
+    catalog: await catalog.health(),
   });
 });
 
-app.use(express.json({ limit: '50mb' }));
+app.use(
+  express.json({
+    limit: '50mb',
+    // Inbound signed webhooks are verified against the exact bytes that were signed.
+    verify: (req, _res, buf) => {
+      if ((req as express.Request).url?.startsWith('/api/inbound/')) (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+    },
+  })
+);
+
+app.use(
+  createCatalogRouter({
+    getContext: catalog.getContext,
+    allowedOrigins,
+    publishLimit: envNumber('PUBLISH_RATE_LIMIT'),
+    uploadLimit: envNumber('UPLOAD_RATE_LIMIT'),
+    sessionCreateLimit: envNumber('SESSION_CREATE_LIMIT'),
+    maxCreationsPerCreator: envNumber('MAX_CREATIONS_PER_CREATOR'),
+  })
+);
+// Body-parser failures (malformed/oversized JSON) on catalog paths are reported as JSON.
+app.use(['/api/creations', '/api/session', '/api/admin', '/api/shows', '/api/webhooks', '/api/inbound', '/api/inbound-sources', '/feeds'], catalogErrorHandler);
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -678,6 +712,12 @@ Return JSON with:
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    app.use((req, _res, next) => {
+      if (req.path === '/showcase') {
+        req.url = '/showcase.html';
+      }
+      next();
+    });
     const vite = await createViteServer({
       server: { middlewareMode: true, ...(process.argv.includes('--strictPort') ? { hmr: false } : {}) },
       appType: 'spa',
@@ -686,7 +726,10 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
+    app.get('/showcase*', (_req, res) => {
+      res.sendFile(path.join(distPath, 'showcase.html'));
+    });
+    app.get('*all', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

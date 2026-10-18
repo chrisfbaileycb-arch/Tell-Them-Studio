@@ -61,7 +61,7 @@ export const StandardsModal: React.FC<StandardsModalProps> = ({ isOpen, onClose 
               3. Duration targets & optional release planning
             </h4>
             <p>
-              Songs, jingles, and podcast lengths are generation targets. Check the finished audio before export. Release plans are notes only; this app does not automatically schedule or distribute episodes.
+              Songs, jingles, and podcast lengths are generation targets. Check the finished audio before export. Release plans in the studio are notes only. With the community service connected, My Library can publish a real RSS feed and publish podcast episodes on a weekly schedule; this app never uploads to Spotify, Apple, YouTube or any other directory for you, so you submit the feed URL yourself.
             </p>
           </div>
 

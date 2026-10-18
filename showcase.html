@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tell Them Studio — Community Showcase</title>
+    <meta name="description" content="Public showcase of original community music tracks and multi-host podcast episodes created with Tell Them Studio.">
+    <meta property="og:title" content="Tell Them Studio — Community Showcase">
+    <meta property="og:description" content="Listen to original community music tracks and multi-host podcast episodes created with Tell Them Studio.">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --background: 0 0% 100%;
+        }
+        body {
+            font-family: 'Geist', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background-color: #f8fafc;
+            color: #09090b;
+            margin: 0;
+            padding: 0;
+        }
+        .card-shadow {
+            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+        }
+        .card-shadow:hover {
+            box-shadow: 0 10px 34px rgba(0,0,0,0.07);
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #18181b;
+            box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f4f4f5;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d4d4d8;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a1a1aa;
+        }
+    </style>
+    <link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="showcase-root"></div>
+    <script type="module" src="/src/showcase/main.tsx"></script>
+</body>
+</html>

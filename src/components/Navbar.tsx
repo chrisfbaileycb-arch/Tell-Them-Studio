@@ -2,6 +2,7 @@ import React from 'react';
 import { AudioLines, Music2, Mic, Megaphone, Sparkles } from 'lucide-react';
 import { StudioTab } from '../../types';
 import { Icons } from '../../constants';
+import { CatalogStatus, ListenPreviewNote } from './CatalogStatus';
 
 interface NavbarProps {
   activeTab: StudioTab;
@@ -74,7 +75,16 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         {/* Zone 3: 1 primary action */}
-        <div className="flex items-center shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          <a
+            href="/showcase"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="nav-open-showcase"
+            className="px-3 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors whitespace-nowrap"
+          >
+            Showcase ↗
+          </a>
           <button
             onClick={onOpenStandards}
             className="px-4 py-2 text-xs font-semibold text-white bg-zinc-950 rounded-xl hover:bg-zinc-900 transition-colors whitespace-nowrap shrink-0"
@@ -122,6 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
           <span>Drafts and library stay in this browser.</span>
+          <CatalogStatus />
         </div>
       </div>
 
@@ -172,9 +183,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       )}
 
       {['listen', 'stations', 'trending'].includes(activeTab) && (
-        <p className="mb-4 text-sm text-gray-600">
-          Local listening preview · demo activity and this browser’s shared tracks. Nothing is published online.
-        </p>
+        <ListenPreviewNote className="mb-4 text-sm text-gray-600" />
       )}
 
       {/* Kindness & Safety Alert Banner */}

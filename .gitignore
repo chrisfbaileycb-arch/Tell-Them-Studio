@@ -26,3 +26,6 @@ dist-ssr
 # Browser test outputs
 test-results/
 playwright-report/
+
+# Local catalog data (dev)
+.data/

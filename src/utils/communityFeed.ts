@@ -1,6 +1,7 @@
 import { CommunityFeedItem, SongResult } from '../../types';
 import { createUniqueSongArtworkSvg } from '../../constants';
 import { createStudioPreviewWavUrl } from './audioUtils';
+import type { PublicCreation } from '../types/community';
 
 export const COMMUNITY_FEED_STORAGE_KEY = 'tell-them-community-feed';
 const IDB_NAME = 'tell-them-community-audio';
@@ -334,4 +335,108 @@ export async function createCommunityFeedItemFromResult(
         }),
     vocalArrangement: result.vocalArrangement,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Live catalog integration (Phase 3)
+//
+// The feed shown in the UI is: local items (published from this browser) + published items
+// from the live catalog. Bundled demo seeds are only a fallback for when the catalog is
+// unreachable (and nothing was cached) or genuinely empty.
+// ---------------------------------------------------------------------------
+
+export const CATALOG_CACHE_STORAGE_KEY = 'tell-them-catalog-cache';
+
+export function mapPublicCreationToFeedItem(c: PublicCreation): CommunityFeedItem {
+  const type: 'music' | 'podcast' = c.kind === 'podcast' ? 'podcast' : 'music';
+  return {
+    id: c.id,
+    remoteId: c.id,
+    fromCatalog: true,
+    remixOf: c.remixOf ?? undefined,
+    title: c.title,
+    creatorHandle: c.creatorHandle,
+    genre: c.genre,
+    audioUrl: c.audioUrl,
+    lyrics: c.lyrics || '',
+    type,
+    createdAt: c.createdAt,
+    narratorInfo: c.narratorInfo || undefined,
+    durationLabel: c.durationLabel || undefined,
+    vocalArrangement: c.vocalArrangement || undefined,
+    coverImageUrl: createUniqueSongArtworkSvg({
+      title: c.title,
+      genre: c.genre,
+      lyrics: c.lyrics || '',
+      creatorHandle: c.creatorHandle,
+      seed: c.id,
+      motif: type === 'podcast' ? 'podcast' : 'band',
+    }),
+  };
+}
+
+export function loadCatalogCache(): PublicCreation[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CATALOG_CACHE_STORAGE_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.filter((c) => c && typeof c.id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCatalogCache(items: PublicCreation[]): void {
+  try {
+    // Audio is always streamed from the server; only metadata is cached.
+    localStorage.setItem(CATALOG_CACHE_STORAGE_KEY, JSON.stringify(items.slice(0, 50)));
+  } catch {
+    // Ignore quota / private-mode failures: the cache is an optimisation only.
+  }
+}
+
+export type CatalogFeedSource = 'catalog' | 'cache' | 'demo';
+
+export interface MergedCommunityFeed {
+  feed: CommunityFeedItem[];
+  source: CatalogFeedSource;
+}
+
+/**
+ * Pure merge of local feed items with the remote catalog.
+ * - remote === null means the catalog could not be reached.
+ * - ownRefs maps server ids to the local id (clientRef) of the owner's own uploads, so a
+ *   locally published item and its server copy are shown once.
+ */
+export function mergeCommunityFeeds(
+  local: CommunityFeedItem[],
+  remote: PublicCreation[] | null,
+  ownRefs: Map<string, string> = new Map()
+): MergedCommunityFeed {
+  const isSeed = (item: CommunityFeedItem) => item.id.startsWith('seed-');
+  const mine = local.filter((item) => !isSeed(item) && !item.fromCatalog);
+  const seeds = local.filter(isSeed);
+
+  let source: CatalogFeedSource = 'demo';
+  let effective: PublicCreation[] = [];
+  if (remote && remote.length > 0) {
+    source = 'catalog';
+    effective = remote;
+  } else if (remote === null) {
+    const cached = loadCatalogCache();
+    if (cached.length > 0) {
+      source = 'cache';
+      effective = cached;
+    }
+  }
+
+  const localIds = new Set(mine.map((item) => item.id));
+  const linked = new Set(mine.map((item) => item.remoteId).filter(Boolean) as string[]);
+  const remoteItems = effective
+    .filter((c) => !linked.has(c.id) && !(ownRefs.has(c.id) && localIds.has(ownRefs.get(c.id) as string)))
+    .map(mapPublicCreationToFeedItem);
+
+  const byNewest = (a: CommunityFeedItem, b: CommunityFeedItem) =>
+    (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0);
+  const combined = [...mine, ...remoteItems].sort(byNewest);
+  // Demo seeds only when there is no live (or cached) catalog content to show.
+  return { feed: source === 'demo' ? [...combined, ...seeds] : combined, source };
 }

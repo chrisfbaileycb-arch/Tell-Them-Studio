@@ -58,5 +58,25 @@ export default defineConfig({
     command: "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: true,
+    env: {
+      // Volatile, isolated catalog: test runs never read or write real creator data.
+      CATALOG_DATA_DIR: ":memory:",
+      // Many API-level tests share one IP; keep the production defaults for the publish limiter.
+      API_RATE_LIMIT: "5000",
+      SESSION_CREATE_LIMIT: "500",
+      PUBLISH_RATE_LIMIT: "10",
+      // Governance (Phase 4): moderator API on, fast worker, ~5s soft-revoke window.
+      ADMIN_API_TOKEN: "test-admin-token-0123456789",
+      REPORT_RATE_LIMIT: "500",
+      JOB_POLL_MS: "200",
+      PURGE_GRACE_DAYS: "0.00006",
+      PURGE_SWEEP_MS: "1000",
+      // Distribution (Phase 4): local webhook receivers and short retry/backoff for tests.
+      // WEBHOOK_ALLOW_PRIVATE is ignored when NODE_ENV=production.
+      WEBHOOK_ALLOW_PRIVATE: "true",
+      JOB_BACKOFF_BASE_MS: "100",
+      WEBHOOK_MAX_ATTEMPTS: "3",
+      PUBLIC_BASE_URL: "http://localhost:3000",
+    },
   },
 });
