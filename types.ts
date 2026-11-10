@@ -82,6 +82,17 @@ export interface ExampleSong {
 
 export type GenerationStatus = 'idle' | 'generating' | 'completed' | 'error';
 
+/**
+ * Present when the server could not produce what was asked for and substituted a placeholder.
+ * `audio`: the audio is a built-in procedural sketch, not provider output.
+ * `text`: the lyrics / script / ad copy are stock placeholder text.
+ */
+export interface GenerationFallback {
+  audio: boolean;
+  text: boolean;
+  reason: 'not_configured' | 'provider_unavailable';
+}
+
 export interface PodcastChapter {
   timestamp: string;
   title: string;
@@ -120,6 +131,8 @@ export interface SongResult {
   id: string;
   itemType?: 'song' | 'podcast' | 'commercial';
   status: GenerationStatus;
+  /** Set when the result is (partly) a placeholder; the UI must say so. */
+  fallback?: GenerationFallback | null;
   logs: string[];
   audioUrl: string | null;
   humanVocalUrl?: string | null;

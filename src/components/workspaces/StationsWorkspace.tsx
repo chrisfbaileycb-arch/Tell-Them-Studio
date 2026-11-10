@@ -203,7 +203,7 @@ export const StationsWorkspace: React.FC<StationsWorkspaceProps> = ({
                         <span aria-hidden="true">·</span>
                         <span>Curated by {st.creatorHandle}</span>
                         <span aria-hidden="true">·</span>
-                        <span>{st.listenersCount} listeners</span>
+                        <span>{st.listenersCount} sample listeners</span>
                       </div>
                       <h3 className="text-xl font-bold text-gray-900 mt-0.5">
                         {st.name}

@@ -93,11 +93,11 @@ Tell Them Studio is engineered for **zero-local assumptions** and deploys direct
 | `NODE_ENV` | No | `development` | Set to `production` to serve prebuilt `./dist` bundles and enforce production security defaults. |
 | `GEMINI_API_KEY` | Recommended | — | Server-side Google Gemini & Lyria API key. Never exposed to browser clients. |
 | `SESSION_SECRET` | Recommended | Auto-generated fallback | 32+ character secret used to sign `HttpOnly`, `SameSite=Lax` creator session cookies (`tt_session`). |
-| `DATABASE_URL` | No | Local `.data` fallback | PostgreSQL connection URI. Automatically bootstraps schema (`creators`, `creations`, `tracks`, `shows`, `episodes`, `publication_moderation`, `governance_logs`, `docs`) on startup. |
+| `DATABASE_URL` | No | Local `./data` fallback | PostgreSQL connection URI. Automatically bootstraps schema (`creators`, `creations`, `tracks`, `shows`, `episodes`, `publication_moderation`, `governance_logs`, `docs`) on startup. |
 | `DATABASE_SSL` | No | `false` | Set to `true` for managed cloud PostgreSQL instances requiring TLS. |
 | `DATABASE_POOL_MAX` | No | `10` | Maximum PostgreSQL connection pool size. |
-| `CATALOG_DATA_DIR` | No | `.data` | Directory for `FileCatalogRepository` and `LocalObjectStorage` when `DATABASE_URL` or `S3_BUCKET` is omitted. Use `:memory:` for ephemeral test runs. |
-| `S3_BUCKET` | No | Local `.data` fallback | S3-compatible bucket name (AWS S3, Cloudflare R2, MinIO) for audio object storage. |
+| `CATALOG_DATA_DIR` | No | `./data` | Directory for `FileCatalogRepository` and `LocalObjectStorage` when `DATABASE_URL` or `S3_BUCKET` is omitted. Use `:memory:` for ephemeral test runs. |
+| `S3_BUCKET` | No | Local `./data` fallback | S3-compatible bucket name (AWS S3, Cloudflare R2, MinIO) for audio object storage. |
 | `S3_REGION` | No | `auto` | S3 region identifier. |
 | `S3_ENDPOINT` | No | — | Custom S3 endpoint URL (required for Cloudflare R2 / MinIO). |
 | `S3_ACCESS_KEY_ID` | No | — | S3 access key ID. |
@@ -105,7 +105,8 @@ Tell Them Studio is engineered for **zero-local assumptions** and deploys direct
 | `S3_KEY_PREFIX` | No | — | Optional key prefix for stored audio objects. |
 | `CDN_BASE_URL` | No | — | Optional public CDN edge URL for `302` public audio redirects (`/api/creations/:id/audio`). |
 | `CDN_PURGE_WEBHOOK_URL` | No | — | Optional webhook URL triggered to invalidate cached audio keys upon deletion/revocation. |
-| `ALLOWED_ORIGINS` | No | Same-origin & preview hosts | Comma-separated list of additional allowed CORS origins. |
+| `ALLOWED_ORIGINS` | No | Same-origin & preview hosts | Comma-separated list of additional allowed CORS origins. Cross-site requests from any other origin are refused; `*` must be set explicitly. |
+| `TRUST_PROXY` | No | `1` in production, off otherwise | Number of proxy hops in front of the app. Needed so rate limits are per visitor (not per platform proxy) and `https` is detected. Use `2` when a CDN sits in front of the platform proxy. |
 | `ADMIN_API_TOKEN` | No | — | Bearer token enabling `/api/admin/*` moderator queue and takedown endpoints. |
 
 ---
