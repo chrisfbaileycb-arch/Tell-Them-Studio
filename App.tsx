@@ -10,6 +10,7 @@ import { WorkspaceRouter } from './src/components/workspaces/WorkspaceRouter';
 import { HandoffModal } from './src/components/modals/HandoffModal';
 import { StandardsModal } from './src/components/modals/StandardsModal';
 import { PersistentCommunityPlayer } from './src/components/PublicCommunityShowcase';
+import { OfflineIndicator } from './src/components/PWAInstallButton';
 
 const normalizeRoute = (route: string): StudioTab => {
   if (route === 'singers' || route === 'acoustic' || route === 'create') return 'bands';
@@ -121,6 +122,8 @@ const AppContent: React.FC = () => {
         onDurationChange={playback.setPersistentDuration}
         onPlayStateChange={playback.setPersistentPlaying}
       />
+
+      <OfflineIndicator />
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }

@@ -3,6 +3,7 @@ import { AudioLines, Music2, Mic, Megaphone, Sparkles } from 'lucide-react';
 import { StudioTab } from '../../types';
 import { Icons } from '../../constants';
 import { CatalogStatus, ListenPreviewNote } from './CatalogStatus';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface NavbarProps {
   activeTab: StudioTab;
@@ -74,8 +75,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           ))}
         </nav>
 
-        {/* Zone 3: 1 primary action */}
+        {/* Zone 3: Primary actions + PWA install */}
         <div className="studio-header-actions flex items-center gap-2 shrink-0">
+          <PWAInstallButton variant="light" />
           <a
             href="/showcase"
             target="_blank"

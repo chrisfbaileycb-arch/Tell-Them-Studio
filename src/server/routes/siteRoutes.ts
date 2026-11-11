@@ -208,7 +208,7 @@ export function createNotFoundHandler(renderer: PageRenderer): RequestHandler {
         res.status(404).json({ error: 'Not found.', code: 'not_found' });
         return;
       }
-      if (/\.[a-z0-9]{2,5}$/i.test(req.path)) {
+      if (/\.[a-z0-9]{2,12}$/i.test(req.path)) {
         res.status(404).type('text/plain').send('Not found');
         return;
       }

@@ -470,6 +470,8 @@ export function createCatalogRouter(opts: CatalogRouteOptions): Router {
 
       res.status(range ? 206 : 200);
       res.setHeader('Content-Type', stored.audioMime);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Disposition', `inline; filename="${stored.audioKey.replace(/[^A-Za-z0-9._-]/g, '')}"`);
       res.setHeader('Accept-Ranges', 'bytes');
       res.setHeader('Content-Length', String(object.range.end - object.range.start + 1));
       if (range) res.setHeader('Content-Range', `bytes ${object.range.start}-${object.range.end}/${stored.audioBytes}`);

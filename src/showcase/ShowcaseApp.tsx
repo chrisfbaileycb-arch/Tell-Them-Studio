@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AudioLines,
+  Check,
   Disc3,
   ExternalLink,
   Headphones,
@@ -22,21 +23,124 @@ import type { PraiseBadge, PublicPraise, PublicShow } from '../types/distributio
 import { PRAISE_BADGES } from '../types/distribution';
 import { createUniqueSongArtworkSvg } from '../../constants';
 import { ReportButton } from '../components/ReportButton';
+import { PWAInstallButton, OfflineIndicator } from '../components/PWAInstallButton';
 
 export interface ShowcaseAppProps {
   apiBase?: string;
 }
 
+/**
+ * Sanitizes an external or query-supplied API base URL so dangerous URI schemes
+ * (`javascript:`, `data:`, `vbscript:`) or embedded credentials are never accepted.
+ */
+export function sanitizeApiBase(raw?: string | null): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const trimmed = raw.trim().replace(/\/+$/, '');
+  if (!trimmed) return '';
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+    return /^\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=-]*$/.test(trimmed) ? trimmed : '';
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+    if (parsed.username || parsed.password) return '';
+    return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, '');
+  } catch {
+    return '';
+  }
+}
+
+export function safeHttpUrl(raw?: string | null, fallback = '#'): string {
+  if (!raw || typeof raw !== 'string') return fallback;
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.toString();
+  } catch {
+    // ignore invalid URL
+  }
+  return fallback;
+}
+
 export function resolveApiBase(prop?: string): string {
-  if (prop) return prop.replace(/\/$/, '');
+  if (prop) return sanitizeApiBase(prop);
   if (typeof window !== 'undefined') {
     const custom = (window as unknown as { __TELL_THEM_API_BASE__?: string }).__TELL_THEM_API_BASE__;
-    if (custom) return custom.replace(/\/$/, '');
+    if (custom) return sanitizeApiBase(custom);
     const query = new URLSearchParams(window.location.search).get('apiBase');
-    if (query) return query.replace(/\/$/, '');
+    if (query) return sanitizeApiBase(query);
   }
   const envBase = (import.meta as unknown as { env?: { VITE_CATALOG_API_BASE?: string } }).env?.VITE_CATALOG_API_BASE;
-  return envBase ? envBase.replace(/\/$/, '') : '';
+  return envBase ? sanitizeApiBase(envBase) : '';
+}
+
+export function buildTrackShareUrl(apiBase: string, trackId: string): string {
+  const path = `${apiBase}/s/${encodeURIComponent(trackId)}`;
+  if (/^https?:\/\//i.test(path)) return path;
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}${path.startsWith('/') ? path : `/${path}`}`;
+  }
+  return path;
+}
+
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall through to legacy textarea copy
+    }
+  }
+  if (typeof document !== 'undefined') {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', 'true');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return copied;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+export async function shareTrackWithFallback(
+  item: Pick<PublicCreation, 'id' | 'title' | 'creatorHandle' | 'genre' | 'kind'>,
+  apiBase: string
+): Promise<'shared' | 'copied' | 'cancelled' | 'failed'> {
+  const url = buildTrackShareUrl(apiBase, item.id);
+  const kindLabel = item.kind === 'podcast' ? 'podcast episode' : 'song';
+  const shareData: ShareData = {
+    title: `${item.title} by ${item.creatorHandle} · Tell Them Studio`,
+    text: `Listen to "${item.title}" (${item.genre} ${kindLabel}) by ${item.creatorHandle} on Tell Them Studio.`,
+    url,
+  };
+
+  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    const canShare = typeof navigator.canShare === 'function' ? navigator.canShare(shareData) : true;
+    if (canShare) {
+      try {
+        await navigator.share(shareData);
+        return 'shared';
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          return 'cancelled';
+        }
+        // Other errors (e.g., NotAllowedError in restricted contexts) fall back to clipboard copy
+      }
+    }
+  }
+
+  const copied = await copyTextToClipboard(url);
+  return copied ? 'copied' : 'failed';
 }
 
 export const ShowcaseApp: React.FC<ShowcaseAppProps> = ({ apiBase: propBase }) => {
@@ -55,6 +159,7 @@ export const ShowcaseApp: React.FC<ShowcaseAppProps> = ({ apiBase: propBase }) =
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
+  const [playerShareFeedback, setPlayerShareFeedback] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -209,6 +314,7 @@ export const ShowcaseApp: React.FC<ShowcaseAppProps> = ({ apiBase: propBase }) =
           </div>
 
           <div className="flex items-center gap-3">
+            <PWAInstallButton variant="dark" />
             <a
               href={`${apiBase}/studio`}
               data-testid="back-to-studio"
@@ -354,7 +460,7 @@ export const ShowcaseApp: React.FC<ShowcaseAppProps> = ({ apiBase: propBase }) =
                   <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-3">
                     <span className="text-xs font-mono text-slate-400 truncate">{show.feedUrl}</span>
                     <a
-                      href={show.feedUrl}
+                      href={safeHttpUrl(show.feedUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shrink-0 flex items-center gap-1"
@@ -435,7 +541,35 @@ export const ShowcaseApp: React.FC<ShowcaseAppProps> = ({ apiBase: propBase }) =
               <span className="text-xs font-mono text-slate-400 w-10">{formatSec(duration)}</span>
             </div>
 
-            <div className="hidden sm:flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="player-share-button"
+                onClick={async () => {
+                  const outcome = await shareTrackWithFallback(activeItem, apiBase);
+                  if (outcome === 'shared') {
+                    setPlayerShareFeedback('Shared!');
+                    setTimeout(() => setPlayerShareFeedback(null), 2500);
+                  } else if (outcome === 'copied') {
+                    setPlayerShareFeedback('Link copied!');
+                    setTimeout(() => setPlayerShareFeedback(null), 2500);
+                  }
+                }}
+                aria-label={`Share ${activeItem.title}`}
+                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-purple-300 flex items-center gap-1.5 transition-colors"
+              >
+                {playerShareFeedback ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">{playerShareFeedback}</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Share</span>
+                  </>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -452,6 +586,7 @@ export const ShowcaseApp: React.FC<ShowcaseAppProps> = ({ apiBase: propBase }) =
           </div>
         </aside>
       )}
+      <OfflineIndicator />
     </div>
   );
 };
@@ -480,6 +615,7 @@ const ShowcaseCard: React.FC<ShowcaseCardProps> = ({ item, apiBase, isActive, is
   });
   const [sendingPraise, setSendingPraise] = useState(false);
   const [praiseStatus, setPraiseStatus] = useState<string | null>(null);
+  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -682,16 +818,43 @@ const ShowcaseCard: React.FC<ShowcaseCardProps> = ({ item, apiBase, isActive, is
           <span>Praise</span>
         </button>
 
-        {/* Every published track has its own page with a link preview, served by the catalog host. */}
+        {/* Every published track has its own page with a link preview, served by the catalog host.
+            Clicking invokes the native Web Share API when supported, falling back to copying the share URL. */}
         <a
           href={`${apiBase}/s/${encodeURIComponent(item.id)}`}
           target="_blank"
           rel="noopener noreferrer"
           data-testid="card-share-link"
+          onClick={async (e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+            e.preventDefault();
+            const outcome = await shareTrackWithFallback(item, apiBase);
+            if (outcome === 'shared') {
+              setShareFeedback('Shared!');
+              setTimeout(() => setShareFeedback(null), 2500);
+            } else if (outcome === 'copied') {
+              setShareFeedback('Link copied!');
+              setTimeout(() => setShareFeedback(null), 2500);
+            } else if (outcome === 'failed') {
+              setShareFeedback('Copy link failed');
+              setTimeout(() => setShareFeedback(null), 2500);
+            }
+          }}
           className="inline-flex items-center gap-1.5 text-slate-400 hover:text-purple-300 font-semibold"
         >
-          <Share2 className="w-3.5 h-3.5" />
-          <span>Share</span>
+          {shareFeedback ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span role="status" data-testid="card-share-feedback" className="text-emerald-400">
+                {shareFeedback}
+              </span>
+            </>
+          ) : (
+            <>
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share</span>
+            </>
+          )}
         </a>
 
         <ReportButton creationId={item.id} title={item.title} />

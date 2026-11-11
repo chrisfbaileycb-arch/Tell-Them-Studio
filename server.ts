@@ -17,6 +17,7 @@ import { createNotFoundHandler, createSiteRouter } from './src/server/routes/sit
 loadEnv({ path: '.env.local', quiet: true });
 loadEnv({ quiet: true });
 const app = express();
+app.disable('x-powered-by');
 const portFlag = process.argv.indexOf('--port');
 const PORT = Number(process.env.PORT || (portFlag >= 0 ? process.argv[portFlag + 1] : 3000));
 
@@ -82,7 +83,9 @@ function isTrustedOrigin(origin: string, req: express.Request): boolean {
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'microphone=(self)');
+  res.setHeader('Permissions-Policy', 'microphone=(self), camera=(), geolocation=(), payment=()');
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
   next();
 });
 
@@ -109,8 +112,27 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     error: 'Too many requests to Tell Them Studio API. Please slow down and try again later.',
+    code: 'rate_limited',
   },
 });
+
+const aiGenerationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: envNumber('AI_RATE_LIMIT') ?? envNumber('API_RATE_LIMIT') ?? 60,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    error: 'Too many AI generation requests. Please wait a moment and try again.',
+    code: 'rate_limited',
+  },
+});
+
+const aiOriginGuard: express.RequestHandler = (req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  const origin = req.headers.origin;
+  if (!origin || isTrustedOrigin(origin, req)) return next();
+  return res.status(403).json({ error: 'Cross-site requests are not allowed.', code: 'forbidden_origin' });
+};
 
 app.use('/api/', apiLimiter);
 
@@ -151,8 +173,45 @@ app.use(
     maxCreationsPerCreator: envNumber('MAX_CREATIONS_PER_CREATOR'),
   })
 );
-// Body-parser failures (malformed/oversized JSON) on catalog paths are reported as JSON.
-app.use(['/api/creations', '/api/session', '/api/admin', '/api/shows', '/api/webhooks', '/api/inbound', '/api/inbound-sources', '/feeds'], catalogErrorHandler);
+
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+const VOICE_NAME_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
+const IMAGE_MIME_PATTERN = /^image\/(png|jpeg|jpg|webp|gif)$/i;
+const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
+const MAX_IMAGE_BASE64_CHARS = 7_000_000;
+
+function sanitizeText(raw: unknown, maxLen: number, fallback = ''): { ok: true; value: string } | { ok: false } {
+  if (raw === undefined || raw === null) return { ok: true, value: fallback };
+  if (typeof raw !== 'string') return { ok: false };
+  const cleaned = raw.replace(CONTROL_CHARS, '').trim();
+  if (cleaned.length > maxLen) return { ok: false };
+  return { ok: true, value: cleaned || fallback };
+}
+
+function validateImagesArray(raw: unknown): { ok: true; value: Array<{ data: string; mimeType: string }> } | { ok: false; error: string } {
+  if (raw === undefined || raw === null) return { ok: true, value: [] };
+  if (!Array.isArray(raw)) return { ok: false, error: 'images must be an array.' };
+  if (raw.length > 4) return { ok: false, error: 'Up to 4 reference images are allowed.' };
+  const out: Array<{ data: string; mimeType: string }> = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') return { ok: false, error: 'Invalid image entry.' };
+    const { data, mimeType } = item as { data?: unknown; mimeType?: unknown };
+    if (typeof mimeType !== 'string' || !IMAGE_MIME_PATTERN.test(mimeType)) {
+      return { ok: false, error: 'Reference images must be PNG, JPEG, WebP, or GIF.' };
+    }
+    if (
+      typeof data !== 'string' ||
+      !data.length ||
+      data.length > MAX_IMAGE_BASE64_CHARS ||
+      !BASE64_PATTERN.test(data)
+    ) {
+      return { ok: false, error: 'Reference image data must be valid base64 under 5 MB.' };
+    }
+    out.push({ data, mimeType });
+  }
+  return { ok: true, value: out };
+}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -179,7 +238,7 @@ function getAiClient() {
 }
 
 function detectGenreFromPrompt(promptText: string): SampleGenre {
-  const lower = (promptText || '').toLowerCase();
+  const lower = (typeof promptText === 'string' ? promptText : '').toLowerCase();
   if (lower.includes('hair metal')) return 'Hair Metal Band';
   for (const genre of GENRES) {
     if (lower.includes(genre.toLowerCase())) return genre;
@@ -273,9 +332,9 @@ async function synthesizeStudioFallbackTrack(
 }
 
 // Creative assistance is server-proxied: keys never enter the browser.
-app.post('/api/creative-assistant', async (req, res) => {
+app.post('/api/creative-assistant', aiOriginGuard, aiGenerationLimiter, async (req, res) => {
   const invalid = validateCreativeRequest(req.body);
-  if (invalid) return res.status(400).json({ error: invalid });
+  if (invalid) return res.status(400).json({ error: invalid, code: 'invalid_input' });
   if (!resolveServerApiKey()) return res.status(503).json({ error: 'The creative assistant is not connected yet. Configure GEMINI_API_KEY on the server. Your library and original sketches work without it.' });
   try {
     const { task, message, history = [], genre = '', audio } = req.body;
@@ -295,11 +354,21 @@ app.post('/api/creative-assistant', async (req, res) => {
 });
 
 // 1. Generate Song Title
-app.post('/api/generate-title', async (req, res) => {
-  const { musicPrompt = '', lyricContext = '' } = req.body || {};
+app.post('/api/generate-title', aiOriginGuard, aiGenerationLimiter, async (req, res) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'A JSON object body is required.', code: 'invalid_body' });
+  }
+  const mp = sanitizeText(req.body.musicPrompt, 4000, '');
+  const lc = sanitizeText(req.body.lyricContext, 10000, '');
+  if (!mp.ok || !lc.ok) {
+    return res.status(400).json({ error: 'Invalid musicPrompt or lyricContext.', code: 'invalid_input' });
+  }
+  const musicPrompt = mp.value;
+  const lyricContext = lc.value;
+
   try {
     const ai = getAiClient();
-    const prompt = `Based on this music prompt: "${musicPrompt}" and these lyrics: "${(lyricContext || '').substring(0, 500)}", generate a catchy, evocative, short song title (3 words max). Return ONLY the title string, no quotes or extra text.`;
+    const prompt = `Based on this music prompt: "${musicPrompt}" and these lyrics: "${lyricContext.substring(0, 500)}", generate a catchy, evocative, short song title (3 words max). Return ONLY the title string, no quotes or extra text.`;
     const response = await generateTextWithFallback(ai, prompt);
     const cleaned = response.text?.trim().replace(/^["']|["']$/g, '');
     if (cleaned) {
@@ -319,11 +388,21 @@ app.post('/api/generate-title', async (req, res) => {
 });
 
 // 2. Generate Cover Art
-app.post('/api/generate-cover', async (req, res) => {
+app.post('/api/generate-cover', aiOriginGuard, aiGenerationLimiter, async (req, res) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'A JSON object body is required.', code: 'invalid_body' });
+  }
+  const mp = sanitizeText(req.body.musicPrompt, 4000, '');
+  const lc = sanitizeText(req.body.lyricContext, 10000, '');
+  const ti = sanitizeText(req.body.title, 200, 'Studio Session');
+  const ge = sanitizeText(req.body.genre, 120, 'Original Music');
+  if (!mp.ok || !lc.ok || !ti.ok || !ge.ok) {
+    return res.status(400).json({ error: 'Invalid cover art request parameters.', code: 'invalid_input' });
+  }
+
   try {
-    const { musicPrompt, lyricContext, title, genre } = req.body || {};
     const ai = getAiClient();
-    const imagePrompt = `A high-quality, professional square album cover picture that coincides directly with the song titled "${title || 'Studio Session'}" (${genre || 'Original Music'}). Visual story & atmosphere from the song: ${musicPrompt}. Lyric imagery: ${(lyricContext || '').substring(0, 240)}. Editorial studio photography and graphic art aesthetic. IMPORTANT: Ignore any mention of BPM or musical scale in the prompt; do NOT print any numbers, BPM, or scale text on the image.`;
+    const imagePrompt = `A high-quality, professional square album cover picture that coincides directly with the song titled "${ti.value}" (${ge.value}). Visual story & atmosphere from the song: ${mp.value}. Lyric imagery: ${lc.value.substring(0, 240)}. Editorial studio photography and graphic art aesthetic. IMPORTANT: Ignore any mention of BPM or musical scale in the prompt; do NOT print any numbers, BPM, or scale text on the image.`;
     const response = await ai.models.generateContent({
       model: process.env.COVER_MODEL || MODELS.COVER_DEFAULT,
       contents: { parts: [{ text: imagePrompt }] },
@@ -342,15 +421,31 @@ app.post('/api/generate-cover', async (req, res) => {
     }
     res.json({ coverImageUrl: base64Image });
   } catch (error: unknown) {
-    const errorMsg = getErrorMessage(error);
-    console.warn('Using studio vector cover art fallback:', errorMsg);
-    res.json({ coverImageUrl: null, warning: errorMsg });
+    console.warn('Using studio vector cover art fallback:', getErrorMessage(error));
+    res.json({ coverImageUrl: null, warning: 'Cover art generation unavailable; using studio artwork.' });
   }
 });
 
 // 3. Generate Music Track (Lyria Pro / Clip with Studio Synth Fallback on Quota / Free-Tier Limits)
-app.post('/api/generate-music', async (req, res) => {
-  const { promptText = '', isClip = false, images = [] } = req.body || {};
+app.post('/api/generate-music', aiOriginGuard, aiGenerationLimiter, async (req, res) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'A JSON object body is required.', code: 'invalid_body' });
+  }
+  const pt = sanitizeText(req.body.promptText, 8000, '');
+  if (!pt.ok) {
+    return res.status(400).json({ error: 'promptText must be a string up to 8,000 characters.', code: 'invalid_input' });
+  }
+  if (req.body.isClip !== undefined && typeof req.body.isClip !== 'boolean') {
+    return res.status(400).json({ error: 'isClip must be a boolean.', code: 'invalid_input' });
+  }
+  const imgCheck = validateImagesArray(req.body.images);
+  if ('error' in imgCheck) {
+    return res.status(400).json({ error: imgCheck.error, code: 'invalid_images' });
+  }
+  const promptText = pt.value;
+  const isClip = Boolean(req.body.isClip);
+  const images = imgCheck.value;
+
   let ai: GoogleGenAI | null = null;
   try {
     ai = getAiClient();
@@ -362,11 +457,11 @@ app.post('/api/generate-music', async (req, res) => {
       : Array.from(new Set([primaryModel, process.env.MUSIC_CLIP_MODEL || 'lyria-3-clip-preview']));
 
     const contents: any =
-      Array.isArray(images) && images.length > 0
+      images.length > 0
         ? {
             parts: [
               { text: promptText },
-              ...images.map((img: { data: string; mimeType: string }) => ({
+              ...images.map((img) => ({
                 inlineData: { data: img.data, mimeType: img.mimeType },
               })),
             ],
@@ -427,32 +522,52 @@ app.post('/api/generate-music', async (req, res) => {
       });
     }
 
-    const fallback = await synthesizeStudioFallbackTrack(ai, promptText, Boolean(isClip));
+    const fallback = await synthesizeStudioFallbackTrack(ai, promptText, isClip);
     return res.json(fallback);
   } catch (error: unknown) {
     console.warn('Music generation fell back to studio synthesizer:', getErrorMessage(error));
     try {
-      const fallback = await synthesizeStudioFallbackTrack(ai, promptText, Boolean(isClip));
+      const fallback = await synthesizeStudioFallbackTrack(ai, promptText, isClip);
       return res.json(fallback);
     } catch (innerErr: unknown) {
-      return res.status(500).json({ error: getErrorMessage(innerErr) || 'Music synthesis failed.' });
+      console.error('Fallback music synthesis error:', getErrorMessage(innerErr));
+      return res.status(500).json({ error: 'Music synthesis failed.', code: 'synthesis_failed' });
     }
   }
 });
 
 // 4. Generate Multi-Host Mini-Podcast (5-10 min structured show + Dual-Speaker TTS)
-app.post('/api/generate-podcast', async (req, res) => {
-  const {
-    showTitle = 'Tell Them Weekly',
-    episodeTopic = 'Creative Studio Stories',
-    targetMinutes = 6,
-    hostAName = 'Alex',
-    hostAVoice = 'Puck',
-    hostBName = 'Sam',
-    hostBVoice = 'Kore',
-    scheduleDay = 'Wednesday',
-    scheduleTime = '08:00 AM',
-  } = req.body || {};
+app.post('/api/generate-podcast', aiOriginGuard, aiGenerationLimiter, async (req, res) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'A JSON object body is required.', code: 'invalid_body' });
+  }
+  const st = sanitizeText(req.body.showTitle, 200, 'Tell Them Weekly');
+  const et = sanitizeText(req.body.episodeTopic, 1000, 'Creative Studio Stories');
+  const ha = sanitizeText(req.body.hostAName, 80, 'Alex');
+  const hav = sanitizeText(req.body.hostAVoice, 40, 'Puck');
+  const hb = sanitizeText(req.body.hostBName, 80, 'Sam');
+  const hbv = sanitizeText(req.body.hostBVoice, 40, 'Kore');
+  const sd = sanitizeText(req.body.scheduleDay, 40, 'Wednesday');
+  const stm = sanitizeText(req.body.scheduleTime, 40, '08:00 AM');
+  if (!st.ok || !et.ok || !ha.ok || !hav.ok || !hb.ok || !hbv.ok || !sd.ok || !stm.ok) {
+    return res.status(400).json({ error: 'Invalid podcast parameters.', code: 'invalid_input' });
+  }
+  if (!VOICE_NAME_PATTERN.test(hav.value) || !VOICE_NAME_PATTERN.test(hbv.value)) {
+    return res.status(400).json({ error: 'Invalid host voice identifier.', code: 'invalid_voice' });
+  }
+  const rawMinutes = req.body.targetMinutes === undefined ? 6 : Number(req.body.targetMinutes);
+  if (!Number.isFinite(rawMinutes) || rawMinutes < 1 || rawMinutes > 30) {
+    return res.status(400).json({ error: 'targetMinutes must be a number between 1 and 30.', code: 'invalid_duration' });
+  }
+  const targetMinutes = Math.min(10, Math.max(5, Math.round(rawMinutes)));
+  const showTitle = st.value;
+  const episodeTopic = et.value;
+  const hostAName = ha.value;
+  const hostAVoice = hav.value;
+  const hostBName = hb.value;
+  const hostBVoice = hbv.value;
+  const scheduleDay = sd.value;
+  const scheduleTime = stm.value;
 
   try {
     const ai = getAiClient();
@@ -612,16 +727,30 @@ Return JSON with:
 });
 
 // 5. Generate Craft Radio/Video Commercial (Authentic Ad Copy + Voiceover)
-app.post('/api/generate-commercial', async (req, res) => {
-  const {
-    brandName = 'Studio Partner',
-    productOrService = 'Creative Audio Production',
-    targetAudience = 'Music & Podcast Fans',
-    adTone = 'Warm & Uplifting',
-    callToAction = 'Visit our studio today',
-    spotLength = '30s',
-    voiceName = 'Fenrir',
-  } = req.body || {};
+app.post('/api/generate-commercial', aiOriginGuard, aiGenerationLimiter, async (req, res) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'A JSON object body is required.', code: 'invalid_body' });
+  }
+  const bn = sanitizeText(req.body.brandName, 200, 'Studio Partner');
+  const ps = sanitizeText(req.body.productOrService, 1000, 'Creative Audio Production');
+  const ta = sanitizeText(req.body.targetAudience, 400, 'Music & Podcast Fans');
+  const at = sanitizeText(req.body.adTone, 200, 'Warm & Uplifting');
+  const cta = sanitizeText(req.body.callToAction, 300, 'Visit our studio today');
+  const sl = sanitizeText(req.body.spotLength, 20, '30s');
+  const vn = sanitizeText(req.body.voiceName, 40, 'Fenrir');
+  if (!bn.ok || !ps.ok || !ta.ok || !at.ok || !cta.ok || !sl.ok || !vn.ok) {
+    return res.status(400).json({ error: 'Invalid commercial parameters.', code: 'invalid_input' });
+  }
+  if (!VOICE_NAME_PATTERN.test(vn.value)) {
+    return res.status(400).json({ error: 'Invalid narrator voice identifier.', code: 'invalid_voice' });
+  }
+  const brandName = bn.value;
+  const productOrService = ps.value;
+  const targetAudience = ta.value;
+  const adTone = at.value;
+  const callToAction = cta.value;
+  const spotLength = sl.value;
+  const voiceName = vn.value;
 
   try {
     const ai = getAiClient();
@@ -775,6 +904,9 @@ Return JSON with:
     });
   }
 });
+
+// Unified JSON error boundary for all API and feed routes (prevents HTML stack trace leaks on malformed JSON or oversized bodies).
+app.use(['/api', '/feeds'], catalogErrorHandler);
 
 async function startServer() {
   const distPath = path.join(process.cwd(), 'dist');
