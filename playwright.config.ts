@@ -61,6 +61,10 @@ export default defineConfig({
     env: {
       // Volatile, isolated catalog: test runs never read or write real creator data.
       CATALOG_DATA_DIR: ":memory:",
+      // Test runs must never spend money on the AI provider, even when a developer has a key in
+      // .env.local: an empty value here wins over dotenv, so generation uses the placeholder path.
+      GEMINI_API_KEY: "",
+      API_KEY: "",
       // Many API-level tests share one IP; keep the production defaults for the publish limiter.
       API_RATE_LIMIT: "5000",
       SESSION_CREATE_LIMIT: "500",

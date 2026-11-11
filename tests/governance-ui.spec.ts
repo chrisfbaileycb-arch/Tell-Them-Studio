@@ -67,7 +67,7 @@ test.describe('governance UI: attribution, reporting, consent', () => {
       const parentId = await createPublished(author, { title: parentTitle, remixPermitted: true });
       await createPublished(remixer, { title: childTitle, remixOfId: parentId });
 
-      await page.goto('/');
+      await page.goto('/studio');
       const showcase = await openListen(page);
       const cardFor = (title: string) =>
         showcase.locator('article').filter({ has: page.getByRole('heading', { name: title, exact: true }) });
@@ -103,7 +103,7 @@ test.describe('governance UI: attribution, reporting, consent', () => {
     await page.route('**/api/generate-title', (route) => route.fulfill({ json: { title: 'Withdrawable Take' } }));
     await page.route('**/api/generate-cover', (route) => route.fulfill({ json: { coverImageUrl: null } }));
 
-    await page.goto('/');
+    await page.goto('/studio');
     await expect(page.getByTestId('catalog-status')).toHaveAttribute('data-catalog-status', 'online');
     try {
       await page.getByRole('button', { name: 'Electronic', exact: true }).click();

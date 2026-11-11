@@ -132,7 +132,7 @@ const INITIAL_OTHER_HUBS: SpecialtyHubItem[] = [
 ];
 
 const GENRE_BAR_COLORS = [
-  '#0f172a',
+  '#ac6aff',
   '#2563eb',
   '#9333ea',
   '#db2777',
@@ -227,7 +227,7 @@ export const TrendingView: React.FC<TrendingViewProps> = ({
       <div className="hero-surface-card rounded-3xl p-8 md:p-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="relative z-10 space-y-3">
           <span className="text-xs text-gray-600 font-geist px-4 py-1.5 bg-gradient-to-tr from-zinc-300/10 via-gray-400/10 to-transparent border-[2px] border-gray-300/30 rounded-3xl w-fit tracking-tight uppercase inline-flex items-center">
-            7-Day Community Pulse · Analytics & Specialty Hubs
+            Sample community pulse · Demo data & specialty hubs
           </span>
           <h1
             className="bg-gradient-to-br from-black from-30% to-black/40 bg-clip-text text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tighter text-transparent leading-none py-1"
@@ -236,7 +236,7 @@ export const TrendingView: React.FC<TrendingViewProps> = ({
             Weekly Community Trends & Specialty Hubs
           </h1>
           <p className="text-sm md:text-base text-gray-600 max-w-3xl leading-relaxed tracking-tight">
-            Real-time 7-day pulse of the most popular band genres, singer arrangements, and acoustic sessions—followed below by the Seasonal Holiday Hub and our rotating community creation hubs.
+            An illustrative 7-day pulse of band genres, singer arrangements, and acoustic sessions. The figures and charts on this page are sample data, not live community activity. Below: the Seasonal Holiday Hub and our rotating community creation hubs.
           </p>
         </div>
 
@@ -263,7 +263,7 @@ export const TrendingView: React.FC<TrendingViewProps> = ({
             {totalWeeklyPraise.toLocaleString()}
           </div>
           <div className="text-xs text-gray-500">
-            100% Handle-Verified Positive Input
+            Sample figure
           </div>
         </div>
 
@@ -273,7 +273,7 @@ export const TrendingView: React.FC<TrendingViewProps> = ({
             {totalStationSpins.toLocaleString()}
           </div>
           <div className="text-xs text-gray-500">
-            Syndicated to Spotify, YouTube & Amazon
+            Sample figure · stations are local previews
           </div>
         </div>
 
@@ -332,17 +332,17 @@ export const TrendingView: React.FC<TrendingViewProps> = ({
                 layout="vertical"
                 margin={{ top: 4, right: 24, left: 16, bottom: 4 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#303d55" horizontal={false} />
                 <XAxis
                   type="number"
-                  tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'JetBrains Mono' }}
-                  axisLine={{ stroke: '#e2e8f0' }}
+                  tick={{ fontSize: 11, fill: '#a4b4cb', fontFamily: 'JetBrains Mono' }}
+                  axisLine={{ stroke: '#43516c' }}
                 />
                 <YAxis
                   type="category"
                   dataKey="genre"
                   width={150}
-                  tick={{ fontSize: 11, fill: '#1e293b', fontWeight: 600 }}
+                  tick={{ fontSize: 11, fill: '#d9deed', fontWeight: 600 }}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -414,17 +414,17 @@ export const TrendingView: React.FC<TrendingViewProps> = ({
                 layout="vertical"
                 margin={{ top: 4, right: 24, left: 16, bottom: 4 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#303d55" horizontal={false} />
                 <XAxis
                   type="number"
-                  tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'JetBrains Mono' }}
-                  axisLine={{ stroke: '#e2e8f0' }}
+                  tick={{ fontSize: 11, fill: '#a4b4cb', fontFamily: 'JetBrains Mono' }}
+                  axisLine={{ stroke: '#43516c' }}
                 />
                 <YAxis
                   type="category"
                   dataKey="theme"
                   width={155}
-                  tick={{ fontSize: 11, fill: '#1e293b', fontWeight: 600 }}
+                  tick={{ fontSize: 11, fill: '#d9deed', fontWeight: 600 }}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -474,13 +474,13 @@ export const TrendingView: React.FC<TrendingViewProps> = ({
                 data={DAILY_COMMUNITY_ACTIVITY}
                 margin={{ top: 8, right: 12, left: -16, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#303d55" />
                 <XAxis
                   dataKey="day"
-                  tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'JetBrains Mono' }}
+                  tick={{ fontSize: 10, fill: '#a4b4cb', fontFamily: 'JetBrains Mono' }}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: '#64748b', fontFamily: 'JetBrains Mono' }}
+                  tick={{ fontSize: 10, fill: '#a4b4cb', fontFamily: 'JetBrains Mono' }}
                 />
                 <Tooltip
                   contentStyle={{
@@ -493,24 +493,27 @@ export const TrendingView: React.FC<TrendingViewProps> = ({
                   type="monotone"
                   dataKey="rockAndCountry"
                   name="Rock & Country Bands"
-                  stroke="#2563eb"
-                  fill="#dbeafe"
+                  stroke="#60a5fa"
+                  fill="#60a5fa"
+                  fillOpacity={0.16}
                   strokeWidth={2}
                 />
                 <Area
                   type="monotone"
                   dataKey="popAndDisco"
                   name="Singers, Pop & Disco"
-                  stroke="#9333ea"
-                  fill="#f3e8ff"
+                  stroke="#c084fc"
+                  fill="#c084fc"
+                  fillOpacity={0.16}
                   strokeWidth={2}
                 />
                 <Area
                   type="monotone"
                   dataKey="holidaySpecials"
                   name="Acoustic & Seasonal"
-                  stroke="#ea580c"
-                  fill="#ffedd5"
+                  stroke="#fb923c"
+                  fill="#fb923c"
+                  fillOpacity={0.16}
                   strokeWidth={2}
                 />
               </AreaChart>

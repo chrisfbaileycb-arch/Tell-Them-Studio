@@ -846,13 +846,14 @@ export const WEEKLY_TRENDING_THEMES = [
 ];
 
 export const DAILY_COMMUNITY_ACTIVITY = [
-  { day: 'Thu (Oct 7)', rockAndCountry: 94, popAndDisco: 72, holidaySpecials: 48 },
-  { day: 'Fri (Oct 8)', rockAndCountry: 142, popAndDisco: 98, holidaySpecials: 64 },
-  { day: 'Sat (Oct 9)', rockAndCountry: 156, popAndDisco: 134, holidaySpecials: 82 },
-  { day: 'Sun (Oct 10)', rockAndCountry: 138, popAndDisco: 112, holidaySpecials: 91 },
-  { day: 'Mon (Oct 11)', rockAndCountry: 108, popAndDisco: 86, holidaySpecials: 96 },
-  { day: 'Tue (Oct 12)', rockAndCountry: 124, popAndDisco: 95, holidaySpecials: 118 },
-  { day: 'Wed (Oct 13)', rockAndCountry: 149, popAndDisco: 118, holidaySpecials: 144 },
+  // Sample data for the demo charts: weekday labels only, so it never shows a stale calendar date.
+  { day: 'Thu', rockAndCountry: 94, popAndDisco: 72, holidaySpecials: 48 },
+  { day: 'Fri', rockAndCountry: 142, popAndDisco: 98, holidaySpecials: 64 },
+  { day: 'Sat', rockAndCountry: 156, popAndDisco: 134, holidaySpecials: 82 },
+  { day: 'Sun', rockAndCountry: 138, popAndDisco: 112, holidaySpecials: 91 },
+  { day: 'Mon', rockAndCountry: 108, popAndDisco: 86, holidaySpecials: 96 },
+  { day: 'Tue', rockAndCountry: 124, popAndDisco: 95, holidaySpecials: 118 },
+  { day: 'Wed', rockAndCountry: 149, popAndDisco: 118, holidaySpecials: 144 },
 ];
 
 export const EXAMPLE_SONGS: ExampleSong[] = [];

@@ -6,6 +6,7 @@
  */
 import { logFunctionCall } from '../utils/logger';
 import { createUniqueSongArtworkSvg } from '../../constants';
+import type { GenerationFallback } from '../../types';
 
 export const parseModelOutput = (text: string): { lyrics: string; metadata: string } => {
   logFunctionCall('parseModelOutput', { textLength: text.length });
@@ -79,7 +80,7 @@ export const requestMusicGeneration = async (params: {
   promptText: string;
   isClip: boolean;
   images: { data: string; mimeType: string }[];
-}): Promise<{ audioBase64: string; mimeType: string; rawText: string }> => {
+}): Promise<{ audioBase64: string; mimeType: string; rawText: string; fallback?: GenerationFallback }> => {
   const res = await fetch('/api/generate-music', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

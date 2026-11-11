@@ -1,96 +1,285 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tell Them Studio</title>
-    <meta name="description" content="Explore genres, write original music, and create your sound. A creative music studio with supporting podcast and commercial audio tools.">
-    <meta property="og:title" content="Tell Them Studio">
-    <meta property="og:description" content="Explore genres, write original music, and create your sound. A creative music studio with supporting podcast and commercial audio tools.">
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --background: 0 0% 100%;
+    <title>__TT_TITLE__</title>
+    <meta name="description" content="__TT_DESCRIPTION__">
+    <!--@head-->
+    <script>
+      // Studio deep links from before the studio moved to /studio (/#library, /#podcasts, ...) keep working.
+      (function () {
+        var tab = location.hash.slice(1);
+        if (/^(bands|singers|acoustic|create|stations|podcasts|commercials|holidays|trending|listen|library|creative)$/.test(tab)) {
+          location.replace('/studio#' + tab);
         }
-        body {
-            font-family: 'Geist', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background-color: #ffffff;
-            color: #09090b;
-        }
-        .font-geist {
-            font-family: 'Geist', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-        }
-        @keyframes fade-in {
-            0% {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        @keyframes fade-up {
-            0% {
-                opacity: 0;
-                transform: translateY(16px);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        .animate-fade-in {
-            animation: fade-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        .animate-fade-up {
-            animation: fade-up 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        .glass {
-            background: rgba(255, 255, 255, 0.82);
-            backdrop-filter: saturate(180%) blur(20px);
-        }
-        .apple-gradient {
-            background: linear-gradient(135deg, #09090b 0%, #27272a 100%);
-        }
-        .creative-gradient {
-            background: linear-gradient(135deg, #18181b 0%, #3f3f46 100%);
-        }
-        .music-gradient {
-            background: linear-gradient(135deg, #09090b 0%, #3b0764 100%);
-        }
-        .card-shadow {
-            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
-        }
-        .card-shadow:hover {
-            box-shadow: 0 10px 34px rgba(0,0,0,0.07);
-        }
-        input:focus, textarea:focus, select:focus {
-            outline: none;
-            border-color: #18181b;
-            box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
-        }
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f4f4f5;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #d4d4d8;
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #a1a1aa;
-        }
-    </style>
-
-<link rel="stylesheet" href="/index.css">
+      })();
+    </script>
+    <script type="module" src="/src/site/main.ts"></script>
 </head>
-<body>
-    <div id="root"></div>
-<script type="module" src="/index.tsx"></script>
+<body class="page-home">
+    <!--@header-->
+
+    <main id="main">
+      <!-- Hero -->
+      <section class="hero">
+        <div class="wrap hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">Songs, podcasts and radio spots from a few words</p>
+            <h1><em>Tell them</em> in a song.</h1>
+            <p class="lede">
+              A birthday, a thank-you, a hometown, a grand opening. Describe it in a sentence and get
+              original music, a two-host podcast or a radio spot, clearly labeled as AI-made and yours to share.
+            </p>
+
+            <form class="composer" id="composer" action="/studio" method="get">
+              <label for="idea">What do you want to tell them?</label>
+              <textarea id="idea" name="idea" rows="2" maxlength="600"
+                placeholder="A birthday song for Mom, who never missed a single recital"></textarea>
+              <div class="composer-ideas" role="group" aria-label="Ideas to start from">
+                <button type="button" data-idea="A warm birthday song for Mom, who never missed a single recital. Gentle acoustic guitar, a chorus the whole family can sing.">Birthday song</button>
+                <button type="button" data-idea="A thank-you song for our volunteers, who showed up every Saturday this year. Upbeat, grateful and a little bit funny.">Thank-you</button>
+                <button type="button" data-idea="A proud hometown anthem about our river, our bridges and Friday night lights. Big drums and a chorus made for a crowd.">Hometown anthem</button>
+                <button type="button" data-idea="A cheerful 30-second jingle for our Saturday farmers' market: fresh bread, local honey and live music from nine to noon.">Market jingle</button>
+              </div>
+              <div class="composer-actions">
+                <button class="btn btn-primary btn-lg" type="submit">
+                  <span>Start my song</span>
+                  <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </button>
+                <p class="composer-note">Free during the preview. No account needed.</p>
+              </div>
+            </form>
+          </div>
+
+          <div class="hero-art" aria-hidden="true">
+            <div class="hero-art-frame">
+              <img src="/images/electric-afterglow.webp" width="1254" height="1254" alt="" fetchpriority="high" decoding="async">
+              <div class="hero-art-bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+            <ul class="hero-art-tags">
+              <li>Labeled as AI-made</li>
+              <li>Yours to download</li>
+              <li>Share with one link</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Formats -->
+      <section class="section" id="formats" aria-labelledby="formats-title">
+        <div class="wrap">
+          <header class="section-head">
+            <p class="eyebrow">What you can make</p>
+            <h2 id="formats-title">One idea, <em>four ways</em> to say it</h2>
+          </header>
+          <div class="cards cards-4">
+            <article class="card">
+              <svg class="icon card-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              <h3>Songs</h3>
+              <p>Full songs and 30-second hooks in more than a dozen genres, or a blend of your own. Choose the voices, bring your own lyrics, or go instrumental and sing over it yourself.</p>
+              <a class="card-link" href="/studio#bands">Make a song</a>
+            </article>
+            <article class="card">
+              <svg class="icon card-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+              <h3>Podcasts</h3>
+              <p>Two hosts in a natural back-and-forth, with chapters and show notes. Publish a standard RSS feed and release episodes on a weekly schedule.</p>
+              <a class="card-link" href="/studio#podcasts">Make a podcast</a>
+            </article>
+            <article class="card">
+              <svg class="icon card-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+              <h3>Radio spots</h3>
+              <p>30- and 60-second commercials with a script, a voiceover and a three-frame storyboard, written to family-safe broadcast standards.</p>
+              <a class="card-link" href="/studio#commercials">Make a radio spot</a>
+            </article>
+            <article class="card">
+              <svg class="icon card-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></svg>
+              <h3>Lyric videos</h3>
+              <p>Turn any track into a lyric video or a spectrum visualizer, rendered right in your browser with the origin label built in.</p>
+              <a class="card-link" href="/studio#bands">Open the studio</a>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- How it works -->
+      <section class="section section-band" id="how" aria-labelledby="how-title">
+        <div class="wrap">
+          <header class="section-head">
+            <p class="eyebrow">How it works</p>
+            <h2 id="how-title">From a sentence to something you can <em>share</em></h2>
+          </header>
+          <ol class="steps">
+            <li>
+              <span class="step-number">1</span>
+              <h3>Describe it</h3>
+              <p>Say who it is for and what you want them to hear. One sentence is enough. If you would like help with the words, the creative assistant drafts lyrics with you.</p>
+            </li>
+            <li>
+              <span class="step-number">2</span>
+              <h3>Shape it</h3>
+              <p>Pick a genre, the voices and a length. Listen, adjust, and try again until it sounds like what you meant.</p>
+            </li>
+            <li>
+              <span class="step-number">3</span>
+              <h3>Share it</h3>
+              <p>Download the audio, export a lyric video, or publish to the community showcase and send a link.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- Trust -->
+      <section class="section" id="trust" aria-labelledby="trust-title">
+        <div class="wrap">
+          <header class="section-head">
+            <p class="eyebrow">Our promises</p>
+            <h2 id="trust-title">Honest <em>by design</em></h2>
+            <p class="section-lede">AI-made music raises fair questions. Here is how we answer them.</p>
+          </header>
+          <ul class="promises">
+            <li>
+              <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+              <div>
+                <h3>Labeled, always</h3>
+                <p>Every creation carries an origin label: AI-generated, or a human voice with an AI band. The label travels with it into the showcase and into exported videos.</p>
+              </div>
+            </li>
+            <li>
+              <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+              <div>
+                <h3>Your consent, your call</h3>
+                <p>You decide whether others may remix your work. Withdraw a published piece and it comes down, along with any remixes built on it.</p>
+              </div>
+            </li>
+            <li>
+              <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></svg>
+              <div>
+                <h3>We never hold your logins</h3>
+                <p>Publishing elsewhere is a handoff: you download and you upload, with your own account. Podcasts get a standard RSS feed that you submit yourself.</p>
+              </div>
+            </li>
+            <li>
+              <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+              <div>
+                <h3>A kind place to share</h3>
+                <p>Everything is screened before it is listed, every public track has a report button, and work that is reported repeatedly is hidden until it has been reviewed.</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Community (live from the public catalog) -->
+      <section class="section section-band" id="community" aria-labelledby="community-title">
+        <div class="wrap">
+          <header class="section-head">
+            <p class="eyebrow">From the community</p>
+            <h2 id="community-title">Hear what people are <em>making</em></h2>
+          </header>
+          <div id="community-feed" class="feed" data-state="loading" aria-live="polite">
+            <p class="feed-status">Loading the latest published tracks…</p>
+          </div>
+          <noscript><p class="feed-status">Listen to published tracks in the <a href="/showcase">community showcase</a>.</p></noscript>
+          <audio id="community-audio" preload="none"></audio>
+          <p class="section-more"><a class="link-arrow" href="/showcase">Open the full showcase</a></p>
+        </div>
+      </section>
+
+      <!-- For business -->
+      <section class="section" id="business" aria-labelledby="business-title">
+        <div class="wrap split">
+          <div>
+            <p class="eyebrow">For shops, shows and organisations</p>
+            <h2 id="business-title">Sound like <em>yourself</em> on the air</h2>
+            <p class="section-lede">A grand opening, a fundraiser, a weekly update for members. Give us the brief and get a spot or an episode you can review, revise and take to your station or feed.</p>
+            <div class="actions">
+              <a class="btn btn-secondary" href="/studio#commercials">Write a radio spot</a>
+              <a class="btn btn-ghost" href="/studio#podcasts">Start a podcast</a>
+            </div>
+          </div>
+          <ul class="checklist">
+            <li><svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><strong>Script, tagline and voiceover</strong> in one pass, for 30 or 60 seconds.</span></li>
+            <li><svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><strong>A three-frame storyboard</strong> if the spot is headed for video.</span></li>
+            <li><svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><strong>No impersonation.</strong> Spots are written without celebrity sound-alikes, and every script is yours to review before it airs.</span></li>
+            <li><svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><strong>A podcast feed you own.</strong> Schedule weekly episodes and submit the RSS feed wherever you like.</span></li>
+          </ul>
+        </div>
+        <div class="wrap">
+          <p class="fineprint">Commercial-use licensing arrives with the Pro plan. Until those terms are published, please treat what you make as personal use.</p>
+        </div>
+      </section>
+
+      <!-- Pricing preview -->
+      <section class="section section-band" id="pricing" aria-labelledby="pricing-title">
+        <div class="wrap">
+          <header class="section-head">
+            <p class="eyebrow">Pricing</p>
+            <h2 id="pricing-title">Pay for what you <em>make</em></h2>
+            <p class="section-lede">Plans come with monthly credits. A full song uses two, a podcast episode three, and a hook or radio spot one.</p>
+          </header>
+          <!--@pricing-notice-->
+          <!--@pricing-compact-->
+          <p class="section-more"><a class="link-arrow" href="/pricing">Compare plans</a></p>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="section" id="faq" aria-labelledby="faq-title">
+        <div class="wrap wrap-narrow">
+          <header class="section-head">
+            <p class="eyebrow">Questions</p>
+            <h2 id="faq-title">Good things to <em>ask</em></h2>
+          </header>
+          <div class="faq">
+            <details>
+              <summary>Is the music really made by AI?</summary>
+              <p>Yes. Songs are generated with Google's Lyria models and voices with Gemini, from your description. Every creation carries a label that says so, in the studio, in the showcase and in the videos you export. If you sing over an instrumental, the label says that too.</p>
+            </details>
+            <details>
+              <summary>Do I need an account?</summary>
+              <p>Not during the preview. You pick a handle and start. Your drafts and library are kept in your own browser, so export anything you want to keep before clearing your browser data. Accounts that follow you across devices are planned with the paid plans.</p>
+            </details>
+            <details>
+              <summary>What does it cost?</summary>
+              <p>The studio is free to use during the preview. Paid plans with monthly credits are planned and are not on sale yet. <a href="/pricing">See the planned pricing.</a></p>
+            </details>
+            <details>
+              <summary>Who owns what I make?</summary>
+              <p>What you write stays yours: your ideas, your lyrics, your scripts. For the generated audio, the rules on AI-made work differ from place to place and also depend on our AI provider's terms, so we do not promise exclusive ownership. Our <a href="/terms">terms of use</a> explain what you can do with your creations.</p>
+            </details>
+            <details>
+              <summary>Can I use a song or a spot for my business?</summary>
+              <p>Commercial-use licensing is planned for the Pro plan. Until those terms are published, please treat what you make as personal use.</p>
+            </details>
+            <details>
+              <summary>Can I make something that sounds like a famous artist?</summary>
+              <p>No. The studio is for original work. It is not built to copy protected lyrics or melodies or to imitate a recognisable singer's voice, and our community rules do not allow it.</p>
+            </details>
+            <details>
+              <summary>Can I put my song on Spotify or YouTube?</summary>
+              <p>You can download your audio and upload it yourself, and podcasts can publish a standard RSS feed that you submit to directories. We never ask for your logins to other platforms and never post for you. Each platform has its own rules for AI-made music, so check them first.</p>
+            </details>
+            <details>
+              <summary>What happens when the AI service is unavailable?</summary>
+              <p>It happens sometimes. When it does, the studio tells you plainly and shows a labeled placeholder instead of passing something off as your song.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- Closing call to action -->
+      <section class="section section-cta" aria-labelledby="cta-title">
+        <div class="wrap">
+          <div class="cta-panel">
+            <h2 id="cta-title">Who do you want to <em>tell?</em></h2>
+            <p>Start with one sentence and see where it goes.</p>
+            <a class="btn btn-primary btn-lg" href="/studio">Open the studio</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!--@footer-->
 </body>
 </html>

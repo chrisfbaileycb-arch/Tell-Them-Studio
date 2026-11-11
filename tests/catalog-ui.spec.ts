@@ -56,7 +56,7 @@ const openListen = async (page: Page) => {
 
 test.describe('catalog UI and fallback modes', () => {
   test('default handle works locally: seeds stay visible and status explains how to sync', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/studio');
     await expect(page.getByTestId('catalog-status')).toHaveAttribute('data-catalog-status', 'needs-handle');
     const showcase = await openListen(page);
     await expect(showcase).toContainText('Sunset Strip Arena Nights');
@@ -66,7 +66,7 @@ test.describe('catalog UI and fallback modes', () => {
   test('with the backend unreachable the studio still loads and falls back to demo content', async ({ page }) => {
     await page.route('**/api/session', (route) => route.abort());
     await page.route('**/api/creations**', (route) => route.abort());
-    await page.goto('/');
+    await page.goto('/studio');
     await expect(page.getByTestId('catalog-status')).toHaveAttribute('data-catalog-status', 'offline');
     await expect(page.getByRole('button', { name: 'Create music', exact: true })).toBeVisible();
     const showcase = await openListen(page);
@@ -76,7 +76,7 @@ test.describe('catalog UI and fallback modes', () => {
 
   test('a non-JSON API response (e.g. misrouted SPA fallback) is treated as offline, not as data', async ({ page }) => {
     await page.route('**/api/creations**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<html></html>' }));
-    await page.goto('/');
+    await page.goto('/studio');
     const showcase = await openListen(page);
     await expect(showcase).toContainText('Sunset Strip Arena Nights');
     await expect(showcase.getByTestId('feed-source')).toHaveAttribute('data-feed-source', 'demo');
@@ -90,7 +90,7 @@ test.describe('catalog UI and fallback modes', () => {
     const title = `Catalog Anthem ${Math.random().toString(36).slice(2, 6)}`;
     const id = await claimAndPublish(api, title);
     try {
-      await page.goto('/');
+      await page.goto('/studio');
       let showcase = await openListen(page);
       await expect(showcase).toContainText(title);
       await expect(showcase).not.toContainText('Sunset Strip Arena Nights');
@@ -125,7 +125,7 @@ test.describe('catalog UI and fallback modes', () => {
     await page.route('**/api/generate-title', (route) => route.fulfill({ json: { title: 'Synced Studio Take' } }));
     await page.route('**/api/generate-cover', (route) => route.fulfill({ json: { coverImageUrl: null } }));
 
-    await page.goto('/');
+    await page.goto('/studio');
     await expect(page.getByTestId('catalog-status')).toHaveAttribute('data-catalog-status', 'online');
     try {
       await page.getByRole('button', { name: 'Electronic', exact: true }).click();
@@ -164,7 +164,7 @@ test.describe('catalog UI and fallback modes', () => {
     await page.route('**/api/generate-title', (route) => route.fulfill({ json: { title: 'Promoted Studio Take' } }));
     await page.route('**/api/generate-cover', (route) => route.fulfill({ json: { coverImageUrl: null } }));
 
-    await page.goto('/');
+    await page.goto('/studio');
     try {
       await page.getByRole('button', { name: 'Electronic', exact: true }).click();
       await page.getByRole('button', { name: 'Instrumental', exact: true }).click();

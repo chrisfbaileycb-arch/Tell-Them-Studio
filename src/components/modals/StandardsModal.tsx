@@ -75,7 +75,14 @@ export const StandardsModal: React.FC<StandardsModalProps> = ({ isOpen, onClose 
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <p className="text-xs text-gray-600">
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 hover:underline">Terms of use</a>
+            <span aria-hidden="true"> · </span>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 hover:underline">Privacy</a>
+            <span aria-hidden="true"> · </span>
+            <a href="/pricing" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 hover:underline">Pricing</a>
+          </p>
           <button
             onClick={onClose}
             className="px-6 py-2.5 rounded-xl bg-gray-900 text-white text-xs font-bold"

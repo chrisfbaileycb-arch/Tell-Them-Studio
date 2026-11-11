@@ -231,7 +231,7 @@ test.describe('Track C: Isolated Showcase Frontend & CDN Delivery', () => {
       await expect(showCard.first()).toBeVisible();
 
       // 5. Open studio link is present
-      await expect(page.getByTestId('back-to-studio')).toHaveAttribute('href', '/');
+      await expect(page.getByTestId('back-to-studio')).toHaveAttribute('href', '/studio');
 
       // 6. Isolated offline mode handling: when backend is unreachable, explains itself gracefully
       const offlinePage = await page.context().newPage();
@@ -247,7 +247,7 @@ test.describe('Track C: Isolated Showcase Frontend & CDN Delivery', () => {
   });
 
   test('navbar includes Showcase link pointing to /showcase', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/studio');
     const showcaseLink = page.getByTestId('nav-open-showcase');
     await expect(showcaseLink).toBeVisible();
     await expect(showcaseLink).toHaveAttribute('href', '/showcase');

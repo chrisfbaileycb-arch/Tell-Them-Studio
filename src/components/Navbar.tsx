@@ -75,7 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         {/* Zone 3: 1 primary action */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="studio-header-actions flex items-center gap-2 shrink-0">
           <a
             href="/showcase"
             target="_blank"
@@ -94,137 +94,143 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </header>
 
-      {/* Workspace Toolbar: Handle Identity, Mobile Tab Switcher & Notices */}
-      <div className="studio-identity flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
-          <span className="font-semibold text-gray-900">Creator Handle:</span>
-          {isEditingHandle ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={handleDraft}
-                onChange={(e) => setHandleDraft(e.target.value)}
-                className="px-2.5 py-1 bg-white border border-gray-300 rounded-lg text-xs font-mono text-gray-900"
-                placeholder="@your_handle"
-              />
+      {/* Workspace toolbar: tool switcher on the left, creator identity on the right. It shares
+          the page gutter with <main>, so nothing sits flush against the screen edge or on top of
+          the header actions. */}
+      <div className="studio-toolbar">
+        <div className="studio-toolbar-row">
+          {activeTab !== 'library' && (
+            <nav aria-label={isCreate ? 'Creation tools' : 'Listening tools'} className="studio-subnav">
+              {(isCreate
+                ? [
+                    { id: 'bands', label: 'Music' },
+                    { id: 'podcasts', label: 'Podcasts' },
+                    { id: 'commercials', label: 'Commercials' },
+                    { id: 'creative', label: 'Creative assistant' },
+                  ]
+                : [
+                    { id: 'listen', label: 'Discover' },
+                    { id: 'stations', label: 'Radio preview' },
+                    { id: 'trending', label: 'Featured demos' },
+                  ]
+              ).map((item) => (
+                <button
+                  key={item.id}
+                  aria-current={activeTab === item.id ? 'page' : undefined}
+                  onClick={() => setActiveTab(item.id as StudioTab)}
+                  className={`rounded-xl border px-4 py-2 text-sm ${
+                    activeTab === item.id
+                      ? 'border-gray-900 bg-gray-100 font-semibold'
+                      : 'border-gray-200'
+                  }`}
+                >
+                  {item.id === 'bands' ? (
+                    <Music2 size={21} />
+                  ) : item.id === 'podcasts' ? (
+                    <Mic size={21} />
+                  ) : item.id === 'commercials' ? (
+                    <Megaphone size={21} />
+                  ) : item.id === 'creative' ? (
+                    <Sparkles size={21} />
+                  ) : null}
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          )}
+
+          {/* Handle identity and live-catalog status */}
+          <div className="studio-identity">
+            <span className="studio-identity-label">Creator Handle:</span>
+            {isEditingHandle ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={handleDraft}
+                  onChange={(e) => setHandleDraft(e.target.value)}
+                  aria-label="Creator handle"
+                  className="px-2.5 py-1 bg-white border border-gray-300 rounded-lg text-xs font-mono text-gray-900"
+                  placeholder="@your_handle"
+                />
+                <button
+                  onClick={() => {
+                    const cleaned = handleDraft.trim().startsWith('@')
+                      ? handleDraft.trim().replace(/\s+/g, '_')
+                      : `@${handleDraft.trim().replace(/\s+/g, '_')}`;
+                    if (cleaned.length > 2) setCreatorHandle(cleaned);
+                    setIsEditingHandle(false);
+                  }}
+                  className="px-2.5 py-1 bg-blue-600 text-white rounded-lg font-semibold"
+                >
+                  Save Handle
+                </button>
+              </div>
+            ) : (
               <button
                 onClick={() => {
-                  const cleaned = handleDraft.trim().startsWith('@')
-                    ? handleDraft.trim().replace(/\s+/g, '_')
-                    : `@${handleDraft.trim().replace(/\s+/g, '_')}`;
-                  if (cleaned.length > 2) setCreatorHandle(cleaned);
-                  setIsEditingHandle(false);
+                  setHandleDraft(creatorHandle);
+                  setIsEditingHandle(true);
                 }}
-                className="px-2.5 py-1 bg-blue-600 text-white rounded-lg font-semibold"
+                className="font-mono font-semibold text-blue-600 hover:underline"
               >
-                Save Handle
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => {
-                setHandleDraft(creatorHandle);
-                setIsEditingHandle(true);
-              }}
-              className="font-mono font-semibold text-blue-600 hover:underline"
-            >
-              {creatorHandle} (Change Handle)
-            </button>
-          )}
-          <span>Drafts and library stay in this browser.</span>
-          <CatalogStatus />
-        </div>
-      </div>
-
-      {draftError && (
-        <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm">
-          Draft saving is unavailable or storage is full. Keep this page open and copy your text before leaving.
-        </p>
-      )}
-
-      {activeTab !== 'library' && (
-        <nav aria-label={isCreate ? 'Creation tools' : 'Listening tools'} className="mb-6 flex flex-wrap gap-2">
-          {(isCreate
-            ? [
-                { id: 'bands', label: 'Music' },
-                { id: 'podcasts', label: 'Podcasts' },
-                { id: 'commercials', label: 'Commercials' },
-                { id: 'creative', label: 'Creative assistant' },
-              ]
-            : [
-                { id: 'listen', label: 'Discover' },
-                { id: 'stations', label: 'Radio preview' },
-                { id: 'trending', label: 'Featured demos' },
-              ]
-          ).map((item) => (
-            <button
-              key={item.id}
-              aria-current={activeTab === item.id ? 'page' : undefined}
-              onClick={() => setActiveTab(item.id as StudioTab)}
-              className={`rounded-xl border px-4 py-2 text-sm ${
-                activeTab === item.id
-                  ? 'border-gray-900 bg-gray-100 font-semibold'
-                  : 'border-gray-200'
-              }`}
-            >
-              {item.id === 'bands' ? (
-                <Music2 size={21} />
-              ) : item.id === 'podcasts' ? (
-                <Mic size={21} />
-              ) : item.id === 'commercials' ? (
-                <Megaphone size={21} />
-              ) : item.id === 'creative' ? (
-                <Sparkles size={21} />
-              ) : null}
-              {item.label}
-            </button>
-          ))}
-        </nav>
-      )}
-
-      {['listen', 'stations', 'trending'].includes(activeTab) && (
-        <ListenPreviewNote className="mb-4 text-sm text-gray-600" />
-      )}
-
-      {/* Kindness & Safety Alert Banner */}
-      {safetyFeedback && (
-        <div className="mb-8 p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-4 text-sm text-amber-900">
-          <div className="flex items-center gap-3">
-            <Icons.ShieldCheck className="w-5 h-5 text-amber-700 shrink-0" />
-            <span>{safetyFeedback}</span>
-          </div>
-          <button
-            onClick={() => setSafetyFeedback(null)}
-            className="px-3 py-1 text-xs font-semibold bg-white border border-amber-200 rounded-lg hover:bg-amber-100 shrink-0"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {communityNotice && (
-        <div role="status" className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-4 text-sm text-emerald-950">
-          <span>{communityNotice}</span>
-          <div className="flex items-center gap-2 shrink-0">
-            {activeTab !== 'listen' && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('listen')}
-                className="px-3 py-1 text-xs font-bold bg-gray-900 text-white rounded-lg"
-              >
-                Open Listen Showcase ↗
+                {creatorHandle} (Change Handle)
               </button>
             )}
+            <span className="studio-identity-note">Drafts and library stay in this browser.</span>
+            <CatalogStatus />
+          </div>
+        </div>
+
+        {draftError && (
+          <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm">
+            Draft saving is unavailable or storage is full. Keep this page open and copy your text before leaving.
+          </p>
+        )}
+
+        {['listen', 'stations', 'trending'].includes(activeTab) && (
+          <ListenPreviewNote className="mb-4 text-sm text-gray-600" />
+        )}
+
+        {/* Kindness & Safety Alert Banner */}
+        {safetyFeedback && (
+          <div className="mb-8 p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-4 text-sm text-amber-900">
+            <div className="flex items-center gap-3">
+              <Icons.ShieldCheck className="w-5 h-5 text-amber-700 shrink-0" />
+              <span>{safetyFeedback}</span>
+            </div>
             <button
-              type="button"
-              onClick={() => setCommunityNotice(null)}
-              className="px-3 py-1 text-xs font-semibold bg-white border border-emerald-200 rounded-lg"
+              onClick={() => setSafetyFeedback(null)}
+              className="px-3 py-1 text-xs font-semibold bg-white border border-amber-200 rounded-lg hover:bg-amber-100 shrink-0"
             >
               Dismiss
             </button>
           </div>
-        </div>
-      )}
+        )}
+
+        {communityNotice && (
+          <div role="status" className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-4 text-sm text-emerald-950">
+            <span>{communityNotice}</span>
+            <div className="flex items-center gap-2 shrink-0">
+              {activeTab !== 'listen' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('listen')}
+                  className="px-3 py-1 text-xs font-bold bg-gray-900 text-white rounded-lg"
+                >
+                  Open Listen Showcase ↗
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setCommunityNotice(null)}
+                className="px-3 py-1 text-xs font-semibold bg-white border border-emerald-200 rounded-lg"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </>
   );
 };

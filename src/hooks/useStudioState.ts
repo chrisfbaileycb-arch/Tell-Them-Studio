@@ -38,6 +38,7 @@ import {
   requestPodcastGeneration,
 } from '../services/genaiService';
 import { getRandomItem } from '../utils/helpers';
+import { placeholderLabel } from '../utils/generationFallback';
 import { HelperSection } from '../components/PromptBuilder';
 import {
   createCommunityFeedItemFromResult,
@@ -536,7 +537,7 @@ export function useStudioState(setActiveTab: (tab: StudioTab) => void) {
 
       updateResult(newId, (r) => ({ ...r, fullPrompt: promptText }));
 
-      const { audioBase64, mimeType, rawText } = await requestMusicGeneration({
+      const { audioBase64, mimeType, rawText, fallback } = await requestMusicGeneration({
         promptText,
         isClip,
         images: selectedImages.map((img) => ({ data: img.data, mimeType: img.mimeType })),
@@ -551,8 +552,18 @@ export function useStudioState(setActiveTab: (tab: StudioTab) => void) {
         audioUrl,
         lyrics: lyrics || (isSingerFree ? 'Instrumental Band Backing Track (Ready for Your Voice)' : ''),
         metadata: metadata || r.metadata,
+        fallback: fallback ?? null,
+        // A placeholder is not the requested length, so it must not carry the requested-length label.
+        maxCapLabel: fallback?.audio ? placeholderLabel('song').toUpperCase() : r.maxCapLabel,
       }));
-      addLog(newId, isClip ? 'Jingle / hook stream captured.' : 'Audio received. Duration is a generation target; review the actual playback length before export.');
+      addLog(
+        newId,
+        fallback?.audio
+          ? 'AI music was unavailable. Loaded a built-in instrumental sketch instead; this is not your finished song.'
+          : isClip
+          ? 'Jingle / hook stream captured.'
+          : 'Audio received. Duration is a generation target; review the actual playback length before export.'
+      );
 
       const title = await generateSongTitle(activePrompt, lyrics || activePrompt);
       const syncedVectorCover = createUniqueSongArtworkSvg({
@@ -685,8 +696,15 @@ export function useStudioState(setActiveTab: (tab: StudioTab) => void) {
         lyrics: formattedScript,
         metadata: `${data.showNotes || `Weekly on ${podcastDay}`} · ${podcastTargetMinutes} Min Mini-Podcast`,
         podcastChapters: data.chapters || [],
+        fallback: data.fallback ?? null,
+        maxCapLabel: data.fallback?.audio ? placeholderLabel('podcast').toUpperCase() : r.maxCapLabel,
       }));
-      addLog(newId, 'Dual-host podcast audio & video-ready transcript finalized.');
+      addLog(
+        newId,
+        data.fallback?.audio
+          ? 'Host voices were unavailable. The audio is a placeholder music bed, not your episode.'
+          : 'Dual-host podcast audio & video-ready transcript finalized.'
+      );
     } catch (err: unknown) {
       updateResult(newId, (r) => ({
         ...r,
@@ -789,8 +807,15 @@ export function useStudioState(setActiveTab: (tab: StudioTab) => void) {
           pgVerified: true,
           storyboard: data.storyboardFrames || [],
         },
+        fallback: data.fallback ?? null,
+        maxCapLabel: data.fallback?.audio ? placeholderLabel('commercial').toUpperCase() : r.maxCapLabel,
       }));
-      addLog(newId, 'Broadcast commercial voiceover & storyboard deck completed.');
+      addLog(
+        newId,
+        data.fallback?.audio
+          ? 'The voiceover was unavailable. The audio is a placeholder music bed, not your spot.'
+          : 'Broadcast commercial voiceover & storyboard deck completed.'
+      );
     } catch (err: unknown) {
       updateResult(newId, (r) => ({
         ...r,

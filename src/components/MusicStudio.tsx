@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 import { ArrowRight, AudioLines, ChevronDown, Download, Guitar, Headphones, Mic, Music2, Plus, Radio, Share2, Sparkles, Users, X } from 'lucide-react';
 import type { BandArchetype, Duration, LyricsOption, SongResult, VocalArrangement } from '../../types';
 import { BAND_ARCHETYPES, VOCAL_ARRANGEMENTS, createUniqueSongArtworkSvg, describeSongPictureTheme } from '../../constants';
+import { describeGenerationFallback } from '../utils/generationFallback';
 
 type ImageReference = { data: string; mimeType: string; previewUrl: string };
 type Props = {
@@ -131,7 +132,7 @@ export function MusicStudio(p: Props) {
       {!p.confirmed && <p role="status" className="studio-help">Confirm your reference permissions in Fine-tune your sound to continue.</p>}
     </section>
     <aside className="studio-featured" aria-label="Featured studio track">
-      <div className="studio-eyebrow">{p.featured && !isDemo ? 'YOUR LATEST SONG POST' : 'STUDIO INSPIRATION'}</div>
+      <div className="studio-eyebrow">{p.featured && !isDemo ? (p.featured.fallback?.audio ? 'PLACEHOLDER SKETCH' : 'YOUR LATEST SONG POST') : 'STUDIO INSPIRATION'}</div>
       <img className="studio-cover" data-testid="featured-song-picture" src={featuredPictureUrl} alt={isDemo || !p.featured ? 'Electric guitar under violet and magenta stage lights' : `Cover art coinciding with ${p.featured.title || 'your creation'}: ${featuredPictureTheme}`} />
       <h2>{p.featured?.title || 'Your next sound starts here.'}</h2>
       <p className="studio-track-meta">
@@ -139,6 +140,7 @@ export function MusicStudio(p: Props) {
           ? `${featuredGenre}${isDemo ? ' · Synthesized instrumental preview' : featuredPictureTheme ? ` · Picture: ${featuredPictureTheme}` : ''}`
           : 'Rock, soul, electronic, or something entirely yours.'}
       </p>
+      {p.featured?.fallback?.audio && <p role="status" data-testid="featured-fallback-notice" className="studio-help studio-placeholder-note">{describeGenerationFallback('song', p.featured.fallback)}</p>}
       {p.featured?.audioUrl && <StudioPlayer src={p.featured.audioUrl} title={p.featured.title || 'Studio track'} />}
       {p.featured && !isDemo && p.featured.audioUrl && (
         <div className="studio-featured-actions">

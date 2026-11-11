@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('one music workspace preserves briefs and jingle settings across navigation and reload', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/studio');
   const main = page.getByRole('navigation', { name: 'Main navigation' });
   await expect(main.getByRole('button')).toHaveCount(3);
   await page.getByRole('button', { name: '0:30 Short clip', exact: true }).click();
@@ -22,7 +22,7 @@ test('one music workspace preserves briefs and jingle settings across navigation
 });
 
 test('creative tools retain separate conversations and drafts through handoff and refresh', async ({ page }) => {
-  await page.goto('/#creative');
+  await page.goto('/studio#creative');
   await page.route('**/api/creative-assistant', route => route.fulfill({ json: { text: 'An original chorus for autumn mornings' } }));
   await page.getByRole('button', { name: 'Lyrics designer', exact: true }).click();
   await page.getByLabel('Your idea', { exact: true }).fill('Write a new chorus');
@@ -48,7 +48,7 @@ test('creative tools retain separate conversations and drafts through handoff an
 });
 
 test('publishing requires manual acknowledgement and podcast release planning is optional', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/studio');
   await page.getByRole('button', { name: 'Handoff Link (Top 10 Platforms)' }).first().click();
   const link = page.getByRole('link', { name: 'Open Spotify Handoff' });
   // Intercept the external navigation while retaining the app's click handler.
@@ -59,7 +59,7 @@ test('publishing requires manual acknowledgement and podcast release planning is
   await expect(page.getByRole('button', { name: 'Upload noted by you ✓' })).toHaveCount(1);
   await page.getByRole('button', { name: 'Upload noted by you ✓' }).click();
   await expect(page.getByRole('button', { name: 'Upload noted by you ✓' })).toHaveCount(0);
-  await page.goto('/#podcasts');
+  await page.goto('/studio#podcasts');
   await expect(page.getByRole('button', { name: /Produce .*Min Podcast/ })).toBeEnabled();
   await expect(page.getByText('Optional release plan · notes only, no automatic scheduling', { exact: true })).toBeVisible();
   await expect(page.getByText('Weekly Consistency & Anti-Spam Pledge:', { exact: true })).toHaveCount(0);

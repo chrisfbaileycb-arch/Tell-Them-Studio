@@ -1,6 +1,23 @@
 import path from 'path';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { expandSitePartials } from './src/site/partials';
+
+/**
+ * Stamps the shared header, footer, pricing and legal fragments into the static marketing
+ * pages. Runs before Vite's own HTML processing, so injected tags are bundled like any other.
+ */
+function sitePartials(): Plugin {
+  return {
+    name: 'tell-them-site-partials',
+    transformIndexHtml: {
+      order: 'pre',
+      handler: (html, ctx) => expandSitePartials(html, ctx.path),
+    },
+  };
+}
+
+const page = (file: string) => path.resolve(__dirname, file);
 
 export default defineConfig(() => {
     return {
@@ -9,7 +26,7 @@ export default defineConfig(() => {
         host: '0.0.0.0',
         allowedHosts: true as const,
       },
-      plugins: [react()],
+      plugins: [sitePartials(), react()],
       resolve: {
         alias: {
           '@': path.resolve('.'),
@@ -18,8 +35,17 @@ export default defineConfig(() => {
       build: {
         rollupOptions: {
           input: {
-            main: path.resolve(__dirname, 'index.html'),
-            showcase: path.resolve(__dirname, 'showcase.html'),
+            // Marketing and legal pages (static HTML, small script).
+            main: page('index.html'),
+            pricing: page('pricing.html'),
+            terms: page('terms.html'),
+            privacy: page('privacy.html'),
+            refunds: page('refunds.html'),
+            share: page('share.html'),
+            notFound: page('404.html'),
+            // Applications.
+            studio: page('studio.html'),
+            showcase: page('showcase.html'),
           },
         },
       },

@@ -44,7 +44,7 @@ test("samples play, library persists, and public permission is independent of re
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/#listen");
+  await page.goto("/studio#listen");
   await expect(
     page.getByRole("heading", {
       name: "A little curiosity. A lot of possibility.",
@@ -107,7 +107,7 @@ test("samples play, library persists, and public permission is independent of re
 test("audio import, mix, lyrics handoff, and mobile layout", async ({
   page,
 }) => {
-  await page.goto("/#library");
+  await page.goto("/studio#library");
   await expect(page.getByLabel("Import audio")).toBeDisabled();
   await page.getByLabel("I own this audio or have permission").check();
   const wav = Buffer.from(await makeGenreSample("Indie", 0).arrayBuffer());
@@ -152,7 +152,7 @@ test("audio import, mix, lyrics handoff, and mobile layout", async ({
       .locator("textarea")
       .filter({ hasText: "A little light is all we need" }),
   ).toBeVisible();
-  await page.goto("/#listen");
+  await page.goto("/studio#listen");
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(
     page.getByRole("heading", {
@@ -183,7 +183,7 @@ test("unconnected assistant is honest; visualizer exports real WebM", async ({
     (_, i) => Math.sin((i / 16000) * 440 * Math.PI * 2) * 0.1,
   );
   const buffer = Buffer.from(await encodeWav([samples], 16000).arrayBuffer());
-  await page.goto("/#library");
+  await page.goto("/studio#library");
   await page.getByLabel("I own this audio or have permission").check();
   await page
     .getByLabel("Import audio")
@@ -209,6 +209,6 @@ test("unconnected assistant is honest; visualizer exports real WebM", async ({
   await expect(
     page.getByText("Visualizer downloaded as WebM.", { exact: false }),
   ).toBeVisible();
-  await page.goto("/#listen");
+  await page.goto("/studio#listen");
   await page.screenshot({ path: "test-results/listening-room.png" });
 });

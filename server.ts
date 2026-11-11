@@ -5,11 +5,14 @@ import { rateLimit } from 'express-rate-limit';
 import { CREATIVE_SYSTEM_INSTRUCTION, validateCreativeRequest } from './src/services/creativePolicy';
 import { GENRES, makeGenreSample, SampleGenre } from './src/utils/creativeAudio';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
+import type { ViteDevServer } from 'vite';
 import { GoogleGenAI, Modality, Type } from '@google/genai';
 import { MODELS } from './src/config/models';
+import type { GenerationFallback } from './types';
 import { startCatalog } from './src/server/catalog/factory';
 import { catalogErrorHandler, createCatalogRouter } from './src/server/routes/catalogRoutes';
+import { createPageRenderer } from './src/server/pages';
+import { createNotFoundHandler, createSiteRouter } from './src/server/routes/siteRoutes';
 
 loadEnv({ path: '.env.local', quiet: true });
 loadEnv({ quiet: true });
@@ -17,7 +20,22 @@ const app = express();
 const portFlag = process.argv.indexOf('--port');
 const PORT = Number(process.env.PORT || (portFlag >= 0 ? process.argv[portFlag + 1] : 3000));
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*')
+// Behind a platform proxy (Cloud Run, Render, Railway, Fly) the socket address is the proxy's,
+// so without this every visitor would share one rate-limit bucket. `TRUST_PROXY` is the number
+// of proxy hops in front of the app: 1 by default in production, off in development.
+function resolveTrustProxy(): number | boolean | string {
+  const raw = process.env.TRUST_PROXY?.trim().toLowerCase();
+  if (!raw) return process.env.NODE_ENV === 'production' ? 1 : false;
+  if (raw === 'false' || raw === '0') return false;
+  if (raw === 'true') return 1;
+  const hops = Number(raw);
+  return Number.isInteger(hops) && hops > 0 ? hops : raw;
+}
+app.set('trust proxy', resolveTrustProxy());
+
+// Extra origins allowed to call the API with credentials. Same-origin requests and the hosted
+// preview domains below are always accepted; `*` must be opted into explicitly.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
@@ -199,11 +217,16 @@ async function generateTextWithFallback(ai: GoogleGenAI, prompt: string, config?
   throw lastError instanceof Error ? lastError : new Error(getErrorMessage(lastError));
 }
 
+/** Why a placeholder was returned: no provider key on this server, or the provider call failed. */
+function fallbackReason(): GenerationFallback['reason'] {
+  return resolveServerApiKey() ? 'provider_unavailable' : 'not_configured';
+}
+
 async function synthesizeStudioFallbackTrack(
   ai: GoogleGenAI | null,
   promptText: string,
   isClip: boolean
-): Promise<{ audioBase64: string; mimeType: string; rawText: string }> {
+): Promise<{ audioBase64: string; mimeType: string; rawText: string; fallback: GenerationFallback }> {
   const genre = detectGenreFromPrompt(promptText);
   const hash = Array.from(promptText || 'studio').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   const variation = hash % 2;
@@ -233,15 +256,19 @@ async function synthesizeStudioFallbackTrack(
     }
   }
 
+  let stockLyrics = false;
   if (!lyricsText) {
+    stockLyrics = true;
     lyricsText = `[Verse 1]\nTurn the studio lights up high tonight\nEvery chord and rhythm catching flight\n\n[Chorus]\nTell them we are ready for the stage\nWriting every note upon the page\nSing it out together, loud and clear\nThe sound we have been waiting for is here`;
   }
 
-  const rawText = `${lyricsText}\n\nMetadata: ${genre} · ${isClip ? '0:30 Studio Clip' : 'Studio Arrangement'}`;
+  const rawText = `${lyricsText}\n\nMetadata: ${genre} · Built-in studio sketch (placeholder)`;
   return {
     audioBase64,
     mimeType: 'audio/wav',
     rawText,
+    // The client must never present this as the requested song: it is a procedural sketch.
+    fallback: { audio: true, text: stockLyrics, reason: fallbackReason() },
   };
 }
 
@@ -444,6 +471,7 @@ Return JSON with:
 - scriptLines: array of 12 to 18 conversational dialogue turns between ${hostAName} and ${hostBName}, approximately ${Number(targetMinutes) * 140} spoken words in total. Duration is a pacing target, not a guaranteed encoded duration.`;
 
     let parsed: any = {};
+    let scriptIsPlaceholder = false;
     try {
       const scriptResponse = await generateTextWithFallback(ai, scriptPrompt, {
         responseMimeType: 'application/json',
@@ -482,6 +510,7 @@ Return JSON with:
       parsed = JSON.parse(scriptResponse.text || '{}');
     } catch (error: unknown) {
       console.warn('Podcast script generation fallback triggered:', getErrorMessage(error));
+      scriptIsPlaceholder = true;
       parsed = {
         episodeTitle: `${showTitle}: ${episodeTopic}`,
         showNotes: `An uplifting ${targetMinutes}-minute studio conversation between ${hostAName} and ${hostBName} exploring ${episodeTopic}.`,
@@ -543,11 +572,16 @@ Return JSON with:
       }
     }
 
+    const speechIsPlaceholder = !audioBase64;
     if (!audioBase64) {
       const wavBlob = makeGenreSample('Jazz', 0);
       audioBase64 = Buffer.from(await wavBlob.arrayBuffer()).toString('base64');
       mimeType = 'audio/wav';
     }
+    const fallback: GenerationFallback | undefined =
+      speechIsPlaceholder || scriptIsPlaceholder
+        ? { audio: speechIsPlaceholder, text: scriptIsPlaceholder, reason: fallbackReason() }
+        : undefined;
 
     res.json({
       episodeTitle: parsed.episodeTitle || `${showTitle}: ${episodeTopic}`,
@@ -556,6 +590,7 @@ Return JSON with:
       scriptLines: lines,
       audioBase64,
       mimeType,
+      ...(fallback ? { fallback } : {}),
     });
   } catch (error: unknown) {
     console.warn('Podcast synthesis fallback triggered:', getErrorMessage(error));
@@ -571,6 +606,7 @@ Return JSON with:
       ],
       audioBase64,
       mimeType: 'audio/wav',
+      fallback: { audio: true, text: true, reason: fallbackReason() } satisfies GenerationFallback,
     });
   }
 });
@@ -612,6 +648,7 @@ Return JSON with:
 - complianceNotes: brief confirmation of PG safety, truth-in-advertising, and no-impersonation compliance.`;
 
     let parsed: any = {};
+    let copyIsPlaceholder = false;
     try {
       const copyResponse = await generateTextWithFallback(ai, adPrompt, {
         responseMimeType: 'application/json',
@@ -649,6 +686,7 @@ Return JSON with:
       parsed = JSON.parse(copyResponse.text || '{}');
     } catch (error: unknown) {
       console.warn('Commercial copy generation fallback triggered:', getErrorMessage(error));
+      copyIsPlaceholder = true;
       parsed = {
         campaignTitle: `${brandName} Spotlight`,
         tagline: `${brandName} — Crafted for You`,
@@ -703,16 +741,22 @@ Return JSON with:
       }
     }
 
+    const voiceIsPlaceholder = !audioBase64;
     if (!audioBase64) {
       const wavBlob = makeGenreSample('Pop Band', 0);
       audioBase64 = Buffer.from(await wavBlob.arrayBuffer()).toString('base64');
       mimeType = 'audio/wav';
     }
+    const fallback: GenerationFallback | undefined =
+      voiceIsPlaceholder || copyIsPlaceholder
+        ? { audio: voiceIsPlaceholder, text: copyIsPlaceholder, reason: fallbackReason() }
+        : undefined;
 
     res.json({
       ...parsed,
       audioBase64,
       mimeType,
+      ...(fallback ? { fallback } : {}),
     });
   } catch (error: unknown) {
     console.warn('Commercial synthesis fallback triggered:', getErrorMessage(error));
@@ -727,33 +771,35 @@ Return JSON with:
       complianceNotes: 'PG Broadcast Verified',
       audioBase64,
       mimeType: 'audio/wav',
+      fallback: { audio: true, text: true, reason: fallbackReason() } satisfies GenerationFallback,
     });
   }
 });
 
 async function startServer() {
+  const distPath = path.join(process.cwd(), 'dist');
+  let vite: ViteDevServer | undefined;
   if (process.env.NODE_ENV !== 'production') {
-    app.use((req, _res, next) => {
-      if (req.path === '/showcase') {
-        req.url = '/showcase.html';
-      }
-      next();
-    });
-    const vite = await createViteServer({
+    // Vite is a development dependency: it is not installed in the production image, so it is
+    // loaded only here. Pages are served by our own routes in both modes (appType: 'custom').
+    const { createServer: createViteServer } = await import('vite');
+    vite = await createViteServer({
       server: { middlewareMode: true, ...(process.argv.includes('--strictPort') ? { hmr: false } : {}) },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get(['/showcase', '/showcase/{*splat}'], (_req, res) => {
-      res.sendFile(path.join(distPath, 'showcase.html'));
-    });
-    app.get('{*splat}', (_req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      appType: 'custom',
     });
   }
+
+  // Pages: landing, pricing, legal, the studio and showcase apps, and /s/:id share pages.
+  const renderer = createPageRenderer({ root: process.cwd(), distDir: distPath, vite });
+  app.use(createSiteRouter({ renderer, getContext: catalog.getContext }));
+
+  if (vite) {
+    app.use(vite.middlewares);
+  } else {
+    // `index: false`: "/" is rendered by the site router, never served as a raw template.
+    app.use(express.static(distPath, { index: false }));
+  }
+  app.use(createNotFoundHandler(renderer));
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Tell Them Studio server listening on 0.0.0.0:${PORT} (${process.env.NODE_ENV || 'development'} mode)`);

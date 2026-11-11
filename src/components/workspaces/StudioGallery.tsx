@@ -4,6 +4,7 @@ import { Icons, createUniqueSongArtworkSvg, describeSongPictureTheme } from '../
 import { CONFIG } from '../../config';
 import { cleanLyricsForDisplay } from '../../utils/lyricsUtils';
 import { SaveCreations } from '../CreativeWorkspace';
+import { describeGenerationFallback, placeholderLabel } from '../../utils/generationFallback';
 
 interface StudioGalleryProps {
   results: SongResult[];
@@ -78,6 +79,11 @@ export const StudioGallery: React.FC<StudioGalleryProps> = ({
           const isGenerating = result.status === 'generating';
           const isFailed = result.status === 'error';
           const isRecordingThis = recordingForId === result.id;
+          const resultKind =
+            result.itemType === 'podcast' ? 'podcast' : result.itemType === 'commercial' ? 'commercial' : 'song';
+          // Placeholder results (provider unavailable) are always labelled as such, never as finished work.
+          const placeholder =
+            result.fallback && (result.fallback.audio || result.fallback.text) ? result.fallback : null;
           const postGenre =
             result.bandType === 'Custom Genre' && result.customGenreName
               ? result.customGenreName
@@ -116,6 +122,16 @@ export const StudioGallery: React.FC<StudioGalleryProps> = ({
               className="group relative transition-all duration-300 bg-white border border-gray-200/80 card-shadow rounded-[36px] overflow-hidden"
             >
               <div className={isExpanded ? 'p-8' : 'p-5'}>
+                {placeholder && (
+                  <p
+                    role="status"
+                    data-testid="fallback-notice"
+                    className="mb-5 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-900 leading-relaxed"
+                  >
+                    <strong>{placeholder.audio ? placeholderLabel(resultKind) : 'Partly a placeholder'}.</strong>{' '}
+                    {describeGenerationFallback(resultKind, placeholder)}
+                  </p>
+                )}
                 {/* Header Row */}
                 <div
                   className={`flex gap-6 items-center ${
@@ -198,7 +214,7 @@ export const StudioGallery: React.FC<StudioGalleryProps> = ({
                       </span>
                       <span aria-hidden="true">·</span>
                       <span className="font-semibold text-emerald-700">
-                        Identifier: {result.originType}
+                        Identifier: {placeholder?.audio ? `${placeholderLabel(resultKind)} (built-in, not AI audio)` : result.originType}
                       </span>
                     </div>
 

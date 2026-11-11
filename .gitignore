@@ -29,3 +29,6 @@ playwright-report/
 
 # Local catalog data (dev)
 .data/
+
+# Default catalog data dir (CATALOG_DATA_DIR=./data): creator data and session.secret
+data/
