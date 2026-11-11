@@ -5,12 +5,14 @@ import { rateLimit } from 'express-rate-limit';
 import { CREATIVE_SYSTEM_INSTRUCTION, validateCreativeRequest } from './src/services/creativePolicy';
 import { GENRES, makeGenreSample, SampleGenre } from './src/utils/creativeAudio';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
+import type { ViteDevServer } from 'vite';
 import { GoogleGenAI, Modality, Type } from '@google/genai';
 import { MODELS } from './src/config/models';
 import type { GenerationFallback } from './types';
 import { startCatalog } from './src/server/catalog/factory';
 import { catalogErrorHandler, createCatalogRouter } from './src/server/routes/catalogRoutes';
+import { createPageRenderer } from './src/server/pages';
+import { createNotFoundHandler, createSiteRouter } from './src/server/routes/siteRoutes';
 
 loadEnv({ path: '.env.local', quiet: true });
 loadEnv({ quiet: true });
@@ -775,28 +777,29 @@ Return JSON with:
 });
 
 async function startServer() {
+  const distPath = path.join(process.cwd(), 'dist');
+  let vite: ViteDevServer | undefined;
   if (process.env.NODE_ENV !== 'production') {
-    app.use((req, _res, next) => {
-      if (req.path === '/showcase') {
-        req.url = '/showcase.html';
-      }
-      next();
-    });
-    const vite = await createViteServer({
+    // Vite is a development dependency: it is not installed in the production image, so it is
+    // loaded only here. Pages are served by our own routes in both modes (appType: 'custom').
+    const { createServer: createViteServer } = await import('vite');
+    vite = await createViteServer({
       server: { middlewareMode: true, ...(process.argv.includes('--strictPort') ? { hmr: false } : {}) },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get(['/showcase', '/showcase/{*splat}'], (_req, res) => {
-      res.sendFile(path.join(distPath, 'showcase.html'));
-    });
-    app.get('{*splat}', (_req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      appType: 'custom',
     });
   }
+
+  // Pages: landing, pricing, legal, the studio and showcase apps, and /s/:id share pages.
+  const renderer = createPageRenderer({ root: process.cwd(), distDir: distPath, vite });
+  app.use(createSiteRouter({ renderer, getContext: catalog.getContext }));
+
+  if (vite) {
+    app.use(vite.middlewares);
+  } else {
+    // `index: false`: "/" is rendered by the site router, never served as a raw template.
+    app.use(express.static(distPath, { index: false }));
+  }
+  app.use(createNotFoundHandler(renderer));
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Tell Them Studio server listening on 0.0.0.0:${PORT} (${process.env.NODE_ENV || 'development'} mode)`);

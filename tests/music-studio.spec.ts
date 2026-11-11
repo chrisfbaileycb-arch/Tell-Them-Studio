@@ -4,7 +4,7 @@ test('music-first studio supports genres, custom blends, vocal modes, and real p
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.setViewportSize({ width: 1440, height: 1024 });
-  await page.goto('/');
+  await page.goto('/studio');
   await expect(page.getByRole('heading', { name: 'Music Studio', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Create music', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Hair Metal Band', exact: true })).toBeVisible();
@@ -38,7 +38,7 @@ test('music-first studio supports genres, custom blends, vocal modes, and real p
 
 test('approved studio design fits desktop and mobile without hidden controls', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1024 });
-  await page.goto('/');
+  await page.goto('/studio');
   await page.locator('.studio-cover').evaluate((img: HTMLImageElement) => img.decode());
   await expect(page.locator('.studio-waveform canvas')).toBeVisible();
   await page.screenshot({ path: 'test-results/music-desktop.png' });
@@ -64,7 +64,7 @@ test('create music sends selected sound controls and saves generated audio to th
   });
   await page.route('**/api/generate-title', route => route.fulfill({ json: { title: 'Fresh Studio Take' } }));
   await page.route('**/api/generate-cover', route => route.fulfill({ json: { coverImageUrl: null } }));
-  await page.goto('/');
+  await page.goto('/studio');
   await page.getByRole('button', { name: 'Electronic', exact: true }).click();
   await page.getByRole('button', { name: 'Instrumental', exact: true }).click();
   await page.getByRole('button', { name: '0:30 Short clip', exact: true }).click();

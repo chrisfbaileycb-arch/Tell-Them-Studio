@@ -349,7 +349,18 @@ export const PublicCommunityShowcase: React.FC<PublicCommunityShowcaseProps> = (
                           </div>
                         )}
                         {track.fromCatalog && track.remoteId && (
-                          <ReportButton creationId={track.remoteId} title={track.title} />
+                          <div className="flex flex-wrap items-center gap-4">
+                            <a
+                              href={`/s/${encodeURIComponent(track.remoteId)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              data-testid="community-share-link"
+                              className="text-xs font-semibold text-blue-600 hover:underline"
+                            >
+                              Share link ↗
+                            </a>
+                            <ReportButton creationId={track.remoteId} title={track.title} />
+                          </div>
                         )}
                       </div>
                     </div>

@@ -1,6 +1,7 @@
 export default {
   content: [
-    "./index.html",
+    "./studio.html",
+    "./showcase.html",
     "./App.tsx",
     "./constants.tsx",
     "./src/**/*.{ts,tsx}",

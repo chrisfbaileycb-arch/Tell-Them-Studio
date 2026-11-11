@@ -20,7 +20,7 @@ Tell Them Studio empowers independent creators, bands, podcasters, and brands to
 
 ## 2. Architecture & System Topology
 
-Tell Them Studio runs as a unified, single-port Express 5 + Vite React 19 service (`server.ts`) that enforces strict server-side credential isolation (`GEMINI_API_KEY` never leaves the server) while serving both the studio SPA (`index.html`) and standalone public showcase (`showcase.html`).
+Tell Them Studio runs as a unified, single-port Express 5 + Vite React 19 service (`server.ts`) that enforces strict server-side credential isolation (`GEMINI_API_KEY` never leaves the server) while serving the public site (landing, pricing, legal and per-track share pages), the studio app at `/studio` (`studio.html`) and the standalone public showcase (`showcase.html`).
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -83,7 +83,7 @@ Tell Them Studio is engineered for **zero-local assumptions** and deploys direct
    npm run build
    NODE_ENV=production PORT=3000 npm start
    ```
-   In production mode (`NODE_ENV=production`), `server.ts` serves compiled assets from `./dist`, routes `/showcase` to `dist/showcase.html`, routes standard SPA paths to `dist/index.html`, and exposes `GET /api/health` for cloud readiness/liveness probes.
+   In production mode (`NODE_ENV=production`), `server.ts` serves compiled assets from `./dist`, renders the public pages and `/s/:id` share pages with per-request social tags, routes `/studio` to `dist/studio.html` and `/showcase` to `dist/showcase.html`, answers unknown paths with a real `404`, and exposes `GET /api/health` for cloud readiness/liveness probes. Vite is only loaded in development, so the production image needs runtime dependencies only.
 
 ### Environment Variables Reference
 
@@ -111,7 +111,23 @@ Tell Them Studio is engineered for **zero-local assumptions** and deploys direct
 
 ---
 
-## 4. Commercial & Governance Features
+## 4. Public Site, Pricing & Share Pages
+
+| Route | What it is |
+| :--- | :--- |
+| `/` | Landing page. An idea typed into its composer is handed to the studio's brief. Old studio links such as `/#library` redirect to `/studio#library`. |
+| `/studio` | The studio application (previously served at `/`). |
+| `/pricing` | Planned membership plans, generated from `src/config/plans.ts`. Marked as preview until billing ships (`PRICING_STATUS.onSale`). |
+| `/terms`, `/privacy`, `/refunds` | Legal pages. They show a **Draft** banner until `SITE.legal.reviewed` is set in `src/config/site.ts`, where the legal entity, contact address and governing law are also filled in. |
+| `/s/:id` | Server-rendered page for one published creation: title, creator, origin label, audio player and lyrics, with Open Graph tags so shared links show a preview. Unpublished, pending or withdrawn work returns `404`. |
+| `/showcase` | The community showcase. |
+| `/robots.txt`, `/sitemap.xml` | Crawler files. The sitemap lists the public pages and the newest published creations. |
+
+The marketing and legal pages are static HTML (`index.html`, `pricing.html`, ...) styled by `src/site/site.css`, with shared header, footer and pricing fragments stamped in at build time from `src/site/partials.ts`. Set `PUBLIC_BASE_URL` in production so canonical and social-preview addresses use your real domain.
+
+---
+
+## 5. Commercial & Governance Features
 
 - **Multi-Workspace Audio Engine**:
   - Dedicated workspaces for **Music & Bands**, **Mini-Podcasts**, **Craft Commercials**, **Seasonal/Holiday Hits**, **Radio Stations**, and **Creative Assistant** tools.
@@ -130,9 +146,9 @@ Tell Them Studio is engineered for **zero-local assumptions** and deploys direct
 
 ---
 
-## 5. Verification & QA Status
+## 6. Verification & QA Status
 
-Tell Them Studio is verified across **10 automated Playwright specification suites** (covering all 8 core functional verification domains plus extended UI and unit checks):
+Tell Them Studio is verified by **12 automated Playwright specification files**. Test runs force an empty AI provider key, so they never spend money and always exercise the placeholder path:
 
 1. `tests/music-studio.spec.ts` — Genre selection, custom blends, vocal arrangements, waveform playback, cover art themes, and persistent community player controls.
 2. `tests/workflows.spec.ts` — Cross-tab draft persistence, creative assistant lyric handoff, manual upload acknowledgement, and mobile viewport responsiveness.
@@ -142,6 +158,8 @@ Tell Them Studio is verified across **10 automated Playwright specification suit
 6. `tests/governance.spec.ts` & `tests/governance-ui.spec.ts` — Remix lineage attribution, depth enforcement, community reporting thresholds, moderator review, and soft/hard consent revocation.
 7. `tests/distribution.spec.ts` & `tests/distribution-ui.spec.ts` — SSRF-guarded outbound webhooks, HMAC signature verification, DST-aware weekly episode scheduling, and RSS 2.0 feed generation.
 8. `tests/showcase-cdn.spec.ts` — Standalone `/showcase` bundle rendering, CDN `302` redirect and `?direct=1` range streaming, CDN cache purge webhooks, and offline graceful degradation.
+9. `tests/placeholder.spec.ts` — When the AI provider is unavailable, every generation endpoint declares its placeholder and the studio labels the result instead of presenting it as finished work.
+10. `tests/site.spec.ts` — Landing page content and social tags, idea handoff into the studio, legacy link redirects, pricing preview with monthly/yearly views, draft legal pages, share pages (escaping, visibility, reporting), sitemap, robots and not-found handling.
 
 ### Build & Verification Commands
 
@@ -149,7 +167,7 @@ Tell Them Studio is verified across **10 automated Playwright specification suit
 # 1. TypeScript static verification (0 errors)
 npx tsc --noEmit
 
-# 2. Multi-entry production bundle (compiles dist/index.html & dist/showcase.html)
+# 2. Multi-entry production bundle (public pages, dist/studio.html and dist/showcase.html)
 npm run build
 
 # 3. Full Playwright end-to-end verification suite

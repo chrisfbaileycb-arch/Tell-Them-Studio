@@ -12,6 +12,7 @@ import {
   Radio,
   Rss,
   Search,
+  Share2,
   Sparkles,
   Volume2,
   VolumeX,
@@ -209,7 +210,7 @@ export const ShowcaseApp: React.FC<ShowcaseAppProps> = ({ apiBase: propBase }) =
 
           <div className="flex items-center gap-3">
             <a
-              href="/"
+              href={`${apiBase}/studio`}
               data-testid="back-to-studio"
               className="text-xs px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold border border-slate-700 flex items-center gap-1.5 transition-colors"
             >
@@ -680,6 +681,18 @@ const ShowcaseCard: React.FC<ShowcaseCardProps> = ({ item, apiBase, isActive, is
           <Heart className="w-3.5 h-3.5" />
           <span>Praise</span>
         </button>
+
+        {/* Every published track has its own page with a link preview, served by the catalog host. */}
+        <a
+          href={`${apiBase}/s/${encodeURIComponent(item.id)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="card-share-link"
+          className="inline-flex items-center gap-1.5 text-slate-400 hover:text-purple-300 font-semibold"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+          <span>Share</span>
+        </a>
 
         <ReportButton creationId={item.id} title={item.title} />
       </div>

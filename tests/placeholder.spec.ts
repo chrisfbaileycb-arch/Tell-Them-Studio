@@ -35,7 +35,7 @@ test.describe('placeholder results are labelled honestly', () => {
   });
 
   test('the studio shows a placeholder as a placeholder, not as a finished song', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/studio');
     await page.getByRole('button', { name: /Create music/ }).click();
 
     const notice = page.getByTestId('fallback-notice').first();
@@ -57,7 +57,7 @@ test.describe('placeholder results are labelled honestly', () => {
     );
     await page.route('**/api/generate-title', (route) => route.fulfill({ json: { title: 'Real Studio Take' } }));
     await page.route('**/api/generate-cover', (route) => route.fulfill({ json: { coverImageUrl: null } }));
-    await page.goto('/');
+    await page.goto('/studio');
     await page.getByRole('button', { name: /Create music/ }).click();
     await expect(page.getByRole('heading', { name: 'Real Studio Take' }).first()).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId('fallback-notice')).toHaveCount(0);

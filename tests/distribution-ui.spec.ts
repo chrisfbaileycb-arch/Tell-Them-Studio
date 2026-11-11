@@ -47,7 +47,7 @@ test.describe('distribution UI: feeds, schedule and webhooks', () => {
     const showTitle = `Studio Weekly ${suffix}`;
     await page.addInitScript((h) => localStorage.setItem('tell-them-handle', h), handle);
 
-    await page.goto('/');
+    await page.goto('/studio');
     await expect(page.getByTestId('catalog-status')).toHaveAttribute('data-catalog-status', 'online');
     try {
       // Create the podcast server-side first; the library mirrors it back on the next sync.
@@ -119,7 +119,7 @@ test.describe('distribution UI: feeds, schedule and webhooks', () => {
 
   test('without a reachable community service the panel explains itself and the library still works', async ({ page }) => {
     await page.route('**/api/session', (route) => route.abort());
-    await page.goto('/');
+    await page.goto('/studio');
     await page.getByRole('button', { name: 'My Library', exact: true }).first().click();
     await expect(page.getByTestId('distribution-unavailable')).toContainText('not reachable');
     await expect(page.getByRole('heading', { name: 'My saved creations' })).toBeVisible();
